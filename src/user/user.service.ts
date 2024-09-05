@@ -43,13 +43,13 @@ export class UserService {
     // 사용자 인증
     async validateUser(phoneOrEmail: string, password: string): Promise<User | null> {
         const user = await this.userModel.findOne({ phoneOrEmail }).exec();
-        if (user && await bcrypt.compare(password, user.password)) {
-            return user;
-        } else if (!user) {
-            throw new ConflictException('존재하지 않는 휴대폰 번호 또는 이메일입니다.')
-        } else if (user && !await bcrypt.compare(password, user.password)) {
-            throw new ConflictException('비밀번호가 일치하지 않습니다.')
+        if (!user) {
+            throw new ConflictException('존재하지 않는 휴대폰 번호 또는 이메일입니다.');
         }
-        return null;
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            throw new ConflictException('비밀번호가 일치하지 않습니다.');
+        }
+        return user;
     }
 }

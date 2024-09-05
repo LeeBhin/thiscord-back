@@ -20,7 +20,7 @@ export class UserController {
     }
 
     // user 생성
-    @Post('create')
+    @Post('register')
     async create(@Body() createUserDto: CreateUserDto) {
         return this.userService.create(createUserDto);
     }
