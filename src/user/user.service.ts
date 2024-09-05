@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
@@ -26,6 +26,11 @@ export class UserService {
 
     // 새로운 user 생성
     async create(createUserDto: CreateUserDto): Promise<User> {
+        const existingUser = await this.userModel.findOne({ phoneOrEmail: createUserDto.phoneOrEmail }).exec();
+        if (existingUser) {
+            throw new ConflictException('이미 가입된 휴대폰 번호 또는 이메일입니다.');
+        }
+
         const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
         const newUser = new this.userModel({
             ...createUserDto,
@@ -40,6 +45,10 @@ export class UserService {
         const user = await this.userModel.findOne({ phoneOrEmail }).exec();
         if (user && await bcrypt.compare(password, user.password)) {
             return user;
+        } else if (!user) {
+            throw new ConflictException('존재하지 않는 휴대폰 번호 또는 이메일입니다.')
+        } else if (user && !await bcrypt.compare(password, user.password)) {
+            throw new ConflictException('비밀번호가 일치하지 않습니다.')
         }
         return null;
     }

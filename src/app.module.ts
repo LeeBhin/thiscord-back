@@ -8,7 +8,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 @Module({
   imports: [
     MongooseModule.forRoot('mongodb://localhost/thiscord'),
-    UserModule
+    UserModule,
   ],
   controllers: [AppController, UserController],
   providers: [AppService],
