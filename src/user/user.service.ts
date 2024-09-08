@@ -26,9 +26,14 @@ export class UserService {
 
     // 새로운 user 생성
     async create(createUserDto: CreateUserDto): Promise<User> {
-        const existingUser = await this.userModel.findOne({ phoneOrEmail: createUserDto.phoneOrEmail }).exec();
-        if (existingUser) {
+        const existingMail = await this.userModel.findOne({ phoneOrEmail: createUserDto.phoneOrEmail }).exec();
+        if (existingMail) {
             throw new ConflictException('이미 가입된 휴대폰 번호 또는 이메일입니다.');
+        }
+
+        const existingName = await this.userModel.findOne({ name: new RegExp(`^${createUserDto.name}$`, 'i') }).exec();
+        if (existingName) {
+            throw new ConflictException('이미 가입된 이름입니다.');
         }
 
         const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
