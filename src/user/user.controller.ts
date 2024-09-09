@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Req, Res, HttpStatus } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
+import { Request, Response } from 'express';
 
 @Controller('users')
 export class UserController {
@@ -27,8 +28,17 @@ export class UserController {
 
     // 로그인
     @Post('login')
-    async login(@Body() loginDto: LoginDto) {
-        const { user, token } = await this.userService.validateUser(loginDto.phoneOrEmail, loginDto.password);
-        return { user, token };
+    async login(@Body() loginDto: LoginDto, @Res() res: Response) {
+        const { userInfo, token } = await this.userService.validateUser(loginDto.phoneOrEmail, loginDto.password);
+
+        res.cookie('jwtToken', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            path: '/'
+        });
+
+        return res.json({ userInfo });
     }
 }
