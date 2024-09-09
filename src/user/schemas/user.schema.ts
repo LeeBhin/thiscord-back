@@ -19,6 +19,9 @@ export class User {
 
     @Prop({ default: Date.now })
     createdAt: Date;
+
+    @Prop()
+    iconColor: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

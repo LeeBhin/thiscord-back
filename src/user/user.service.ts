@@ -26,6 +26,14 @@ export class UserService {
 
     // 새로운 user 생성
     async create(createUserDto: CreateUserDto): Promise<User> {
+
+        const colors = [
+            '#5865F2', '#57F287', '#EB459E', '#FEE75C', '#ED4245', '#7289DA', '#FFA500',
+            '#23272A', '#99AAB5', '#2C2F33', '#3498DB', '#9B59B6', '#1ABC9C', '#E74C3C',
+            '#F39C12', '#C0392B', '#8E44AD', '#2ECC71', '#16A085', '#D35400', '#34495E',
+            '#7F8C8D'
+        ];
+
         const existingMail = await this.userModel.findOne({ phoneOrEmail: createUserDto.phoneOrEmail }).exec();
         if (existingMail) {
             throw new ConflictException('이미 가입된 휴대폰 번호 또는 이메일입니다.');
@@ -36,11 +44,14 @@ export class UserService {
             throw new ConflictException('이미 가입된 이름입니다.');
         }
 
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
         const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
         const newUser = new this.userModel({
             ...createUserDto,
             userId: uuidv4(),
             password: hashedPassword,
+            iconColor: randomColor
         });
         return newUser.save();
     }
