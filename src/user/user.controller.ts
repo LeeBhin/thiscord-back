@@ -28,6 +28,7 @@ export class UserController {
     // 로그인
     @Post('login')
     async login(@Body() loginDto: LoginDto) {
-        return this.userService.validateUser(loginDto.phoneOrEmail, loginDto.password);
+        const { user, token } = await this.userService.validateUser(loginDto.phoneOrEmail, loginDto.password);
+        return { user, token };
     }
 }
