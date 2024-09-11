@@ -1,22 +1,22 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { UserController } from './user/user.controller';
-import { UserModule } from './user/user.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule } from '@nestjs/config';
-import { AuthController } from './auth/auth.controller';
+import { JwtModule } from '@nestjs/jwt';
+import { UserModule } from './user/user.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
-    MongooseModule.forRoot('mongodb+srv://22a617h0659:7rxsDnN93U09vAVx@cluster0.ucfa7.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'),
+    ConfigModule.forRoot({ isGlobal: true }),
+    MongooseModule.forRoot(process.env.MONGODB_URI),
+    JwtModule.register({
+      secret: process.env.JWT_SECRET,
+      signOptions: { expiresIn: '7d' },
+    }),
     UserModule,
-    ConfigModule.forRoot({
-      isGlobal: true,
-    })
   ],
-  controllers: [AppController, UserController, AuthController],
+  controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule { }
-
