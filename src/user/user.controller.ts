@@ -33,12 +33,26 @@ export class UserController {
 
         res.cookie('jwtToken', token, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
             sameSite: 'lax',
             maxAge: 7 * 24 * 60 * 60 * 1000,
             path: '/'
         });
 
         return res.json({ userInfo });
+    }
+
+    // 로그아웃
+    @Post('logout')
+    async logout(@Res() res: Response) {
+        res.cookie('jwtToken', '', {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'lax',
+            maxAge: 0,
+            path: '/'
+        });
+
+        return res.status(HttpStatus.OK).json({ message: '로그아웃되었습니다.' });
     }
 }

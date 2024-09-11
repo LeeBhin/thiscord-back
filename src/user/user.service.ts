@@ -6,7 +6,6 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import * as jwt from 'jsonwebtoken';
 
 @Injectable()
 export class UserService {
@@ -78,7 +77,10 @@ export class UserService {
             iconColor: user.iconColor
         };
 
-        const token = this.jwtService.sign(payload);
+        const token = this.jwtService.sign(payload, {
+            secret: process.env.JWT_SECRET,
+            expiresIn: '7d',
+        });
 
         const userInfo = {
             name: user.name,
@@ -86,14 +88,5 @@ export class UserService {
         }
 
         return { userInfo, token };
-    }
-
-    // 토큰 검증
-    verifyToken(token: string): void {
-        try {
-            jwt.verify(token, process.env.JWT_SECRET);
-        } catch (err) {
-            throw new Error(err);
-        }
     }
 }
