@@ -1,7 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Req, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'supertest';
 import { FriendsService } from './friends.service';
-import { CreateFriendDto } from 'src/dto/create-friend.dto';
 import { UserService } from 'src/user/user.service';
 
 @Controller('friends')
@@ -48,7 +47,6 @@ export class FriendsController {
         }
 
         const decoded = this.userService.verifyToken(token);
-
         const userId = decoded.userId;
 
         return this.friendsService.getFriends(userId);

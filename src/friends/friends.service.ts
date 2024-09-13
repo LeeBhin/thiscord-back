@@ -91,21 +91,34 @@ export class FriendsService {
     async deleteFriend(userid: string, friendid: string): Promise<void> {
     }
 
-    // 친구 조회
-    async getFriends(userid: string): Promise<any[]> {
+    async getFriends(userid: string): Promise<{ name: string, iconColor: string }[]> {
         try {
+            // 사용자 문서
             const friendDocument = await this.friendModel.findOne({ userid }).exec();
-
             if (!friendDocument) {
                 throw new NotFoundException('User not found');
             }
-            return friendDocument.friends;
+
+            // 상태 accepted 인것만
+            const acceptedFriends = friendDocument.friends.filter(friend => friend.status === 'accepted');
+
+            // userid
+            const friendIds = acceptedFriends.map(friend => friend.friendid);
+
+            // name, iconColor
+            const friends = await this.userModel.find({ userId: { $in: friendIds } }).exec();
+
+            return friends.map(friend => ({
+                name: friend.name,
+                iconColor: friend.iconColor
+            }));
 
         } catch (err) {
             console.error(err);
-            throw new NotFoundException('Error retrieving friends');
+            throw new NotFoundException('get_friends Error');
         }
     }
+
 
     // 새로운 사용자 추가
     async createFriendDocument(userId: string): Promise<void> {
