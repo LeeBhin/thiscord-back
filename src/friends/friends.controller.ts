@@ -12,9 +12,18 @@ export class FriendsController {
     ) { }
 
     // 친구 요청
-    @Post('request')
-    async sendRequest(@Body() createFriendDto: CreateFriendDto) {
-        return this.friendsService.sendRequest(createFriendDto);
+    @Post('request/:friend')
+    async sendRequest(@Param('friend') friendName: string, @Req() req: Request) {
+
+        const token = req.cookies['jwtToken'];
+        if (!token) {
+            throw new UnauthorizedException('No token provided');
+        }
+
+        const decoded = this.userService.verifyToken(token);
+        const userId = decoded.userId;
+
+        return this.friendsService.sendRequest(userId, friendName);
     }
 
     // 요청 수락

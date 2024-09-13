@@ -7,12 +7,14 @@ import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { error } from 'console';
+import { FriendsService } from 'src/friends/friends.service';
 
 @Injectable()
 export class UserService {
     constructor(
         @InjectModel(User.name) private userModel: Model<UserDocument>,
         private jwtService: JwtService,
+        private readonly friendsService: FriendsService,
     ) { }
 
     // 모든 user 조회
@@ -58,7 +60,13 @@ export class UserService {
             password: hashedPassword,
             iconColor: randomColor
         });
-        return newUser.save();
+
+        const savedUser = await newUser.save();
+
+        // Friend 문서 생성
+        await this.friendsService.createFriendDocument(savedUser.userId);
+
+        return savedUser;
     }
 
     // 사용자 인증
