@@ -55,4 +55,22 @@ export class UserController {
 
         return res.status(HttpStatus.OK).json({ message: '로그아웃되었습니다.' });
     }
+
+    @Post('check-token')
+    async checkToken(@Req() req: Request, @Res() res: Response) {
+        const token = req.cookies['jwtToken'];
+
+        if (!token) {
+            console.log('No token found');
+            return res.status(HttpStatus.UNAUTHORIZED).json({ message: 'No token found' });
+        }
+
+        try {
+            this.userService.verifyToken(token);
+            return res.status(HttpStatus.OK).json({ message: 'Token is valid' });
+        } catch (error) {
+            console.log('Token verification failed:', error.message);
+            return res.status(HttpStatus.UNAUTHORIZED).json({ message: 'Invalid token' });
+        }
+    }
 }

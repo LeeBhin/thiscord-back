@@ -14,6 +14,7 @@ export class FriendsService {
 
     // 친구 요청
     async sendRequest(createFriendDto: CreateFriendDto): Promise<any> {
+        
     }
 
     // 요청 수락

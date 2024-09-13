@@ -6,6 +6,7 @@ import { CreateUserDto } from '../dto/create-user.dto';
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { error } from 'console';
 
 @Injectable()
 export class UserService {
@@ -89,5 +90,15 @@ export class UserService {
         }
 
         return { userInfo, token };
+    }
+
+    verifyToken(token: string): any {
+        try {
+            this.jwtService.verify(token, {
+                secret: process.env.JWT_SECRET,
+            });
+        } catch (err) {
+            throw new error(err);
+        }
     }
 }

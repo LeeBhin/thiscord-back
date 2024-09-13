@@ -1,15 +1,14 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Req, UnauthorizedException } from '@nestjs/common';
 import { FriendsService } from './friends.service';
 import { CreateFriendDto } from 'src/dto/create-friend.dto';
-import { AuthService } from 'src/auth/auth.service';
+import { UserService } from 'src/user/user.service';
 
 @Controller('friends')
 export class FriendsController {
     constructor(
         private readonly friendsService: FriendsService,
-        private readonly authService: AuthService,
+        private readonly userService: UserService,
     ) { }
-
 
     // 친구 요청
     @Post('request')
@@ -38,7 +37,9 @@ export class FriendsController {
             throw new UnauthorizedException('No token provided');
         }
 
-        const userId = this.authService.verifyToken(token);
+        const decoded = this.userService.verifyToken(token);
+
+        const userId = decoded.userId;
 
         return this.friendsService.getFriends(userId);
     }
