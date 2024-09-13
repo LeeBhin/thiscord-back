@@ -1,5 +1,4 @@
 export class CreateFriendDto {
-    readonly userid: string;
-    readonly friendid: string;
-  }
-  
+  readonly userId: string;
+  readonly friendId: string;
+}

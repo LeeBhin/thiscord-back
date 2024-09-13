@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Req, UnauthorizedException } from '@nestjs/common';
+import { Request } from 'supertest';
 import { FriendsService } from './friends.service';
 import { CreateFriendDto } from 'src/dto/create-friend.dto';
 import { UserService } from 'src/user/user.service';
@@ -31,7 +32,7 @@ export class FriendsController {
     // 친구 조회
     @Get('list')
     async getFriends(@Req() req: Request) {
-        const token = req.headers['authorization']?.split(' ')[1];
+        const token = req.cookies['jwtToken'];
 
         if (!token) {
             throw new UnauthorizedException('No token provided');

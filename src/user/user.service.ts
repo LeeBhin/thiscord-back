@@ -94,9 +94,10 @@ export class UserService {
 
     verifyToken(token: string): any {
         try {
-            this.jwtService.verify(token, {
+            const decoded = this.jwtService.verify(token, {
                 secret: process.env.JWT_SECRET,
             });
+            return decoded
         } catch (err) {
             throw new error(err);
         }
