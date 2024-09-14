@@ -36,9 +36,8 @@ export class UserService {
 
         const colors = [
             '#5865F2', '#57F287', '#EB459E', '#FEE75C', '#ED4245', '#7289DA', '#FFA500',
-            '#23272A', '#99AAB5', '#2C2F33', '#3498DB', '#9B59B6', '#1ABC9C', '#E74C3C',
+            '#23272A', '#99AAB5', '#3498DB', '#9B59B6', '#1ABC9C', '#E74C3C', '#7F8C8D',
             '#F39C12', '#C0392B', '#8E44AD', '#2ECC71', '#16A085', '#D35400', '#34495E',
-            '#7F8C8D'
         ];
 
         const existingMail = await this.userModel.findOne({ phoneOrEmail: createUserDto.phoneOrEmail }).exec();
@@ -64,7 +63,7 @@ export class UserService {
         const savedUser = await newUser.save();
 
         // Friend 문서 생성
-        await this.friendsService.createFriendDocument(savedUser.userId);
+        await this.friendsService.createFriendDocument(savedUser.userId, createUserDto.name);
 
         return savedUser;
     }

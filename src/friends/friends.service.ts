@@ -13,74 +13,73 @@ export class FriendsService {
         private readonly jwtService: JwtService,
     ) { }
 
-    // 친구 요청
-    async sendRequest(userId: string, friendName: string): Promise<any> {
 
-        // 사용자
+    async sendRequest(userId: string, friendName: string): Promise<any> {
         const user = await this.friendModel.findOne({ userid: userId }).exec();
         if (!user) {
             throw new NotFoundException('사용자를 찾을 수 없음');
         }
 
-        // 친구 이름 -> userid
         const friend = await this.userModel.findOne({ name: friendName }).exec();
         if (!friend) {
             throw new NotFoundException('친구를 찾을 수 없음');
         }
 
         const friendId = friend.userId;
-
-        // 사용자 배열 상태 확인
-        const userFriendIndex = user.friends.findIndex(f => f.friendid === friendId);
-
-        // 친구 배열 상태 확인
         const friendDocument = await this.friendModel.findOne({ userid: friendId }).exec();
         if (!friendDocument) {
             throw new NotFoundException('Friend user document not found');
         }
 
+        const userFriendIndex = user.friends.findIndex(f => f.friendid === friendId);
         const friendUserFriendIndex = friendDocument.friends.findIndex(f => f.friendid === userId);
 
-        if (userFriendIndex !== -1 && friendUserFriendIndex !== -1) {
-            if (user.friends[userFriendIndex].status === 'pending' && friendDocument.friends[friendUserFriendIndex].status === 'pending') {
-                // 서로 요청 보냈을 때 수락 처리
-                user.friends[userFriendIndex].status = 'accepted';
-                user.friends[userFriendIndex].createdat = new Date();
+        // 이미 친구 상태 또는 요청 상태인지 확인
+        if (userFriendIndex !== -1) {
+            const userStatus = user.friends[userFriendIndex].status;
 
-                friendDocument.friends[friendUserFriendIndex].status = 'accepted';
-                friendDocument.friends[friendUserFriendIndex].createdat = new Date();
-
-                // 사용자, 친구 저장
-                await user.save();
-                await this.friendModel.findOneAndUpdate({ userid: friendId }, { friends: friendDocument.friends }, { new: true });
-
-                return { message: 'Friend request accepted successfully' };
-            } else if (user.friends[userFriendIndex].status === 'accepted') {
-                throw new ConflictException('Already friends');
-            } else if (user.friends[userFriendIndex].status === 'pending') {
-                throw new ConflictException('Request already sent');
+            if (userStatus === 'accepted') {
+                throw new ConflictException('이미 친구입니다.');
+            }
+            if (userStatus === 'pending') {
+                throw new ConflictException('이미 친구 요청을 보냈습니다.');
             }
         }
 
-        // 사용자 배열에 친구 요청 추가
+        // 친구가 이미 나에게 요청을 보낸 상태면 수락 처리
+        if (friendUserFriendIndex !== -1 && friendDocument.friends[friendUserFriendIndex].status === 'pending') {
+            user.friends.push({
+                friendid: friendId,
+                status: 'accepted',
+                createdat: new Date(),
+            });
+
+            friendDocument.friends[friendUserFriendIndex].status = 'accepted';
+            friendDocument.friends[friendUserFriendIndex].createdat = new Date();
+
+            await user.save();
+            await friendDocument.save();
+
+            return { message: '친구 요청을 수락했습니다.' };
+        }
+
+        // 새로운 친구 요청 추가
         user.friends.push({
             friendid: friendId,
             status: 'pending',
             createdat: new Date(),
         });
 
-        // 친구 배열에 추가
         friendDocument.friends.push({
             friendid: userId,
             status: 'pending',
             createdat: new Date(),
         });
 
-        // 사용자, 친구 저장
         await user.save();
         await friendDocument.save();
 
-        return { message: 'Friend request sent successfully' };
+        return { message: '친구 요청을 보냈습니다.' };
     }
 
     // 요청 수락
@@ -121,10 +120,11 @@ export class FriendsService {
 
 
     // 새로운 사용자 추가
-    async createFriendDocument(userId: string): Promise<void> {
+    async createFriendDocument(userId: string, name: string): Promise<void> {
         // 기본 문서 생성
         const newFriendDocument = new this.friendModel({
             userid: userId,
+            name: name,
             friends: []
         });
         await newFriendDocument.save();
