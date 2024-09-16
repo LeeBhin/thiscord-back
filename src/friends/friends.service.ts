@@ -13,9 +13,10 @@ export class FriendsService {
         private readonly jwtService: JwtService,
     ) { }
 
-
     async sendRequest(userId: string, friendName: string): Promise<any> {
         const user = await this.friendModel.findOne({ userid: userId }).exec();
+        const myName = (await this.userModel.findOne({ userId }).exec()).name;
+
         if (!user) {
             throw new ConflictException('user not found');
         }
@@ -36,54 +37,72 @@ export class FriendsService {
         }
 
         const userFriendIndex = user.friends.findIndex(f => f.friendid === friendId);
-        const friendUserFriendIndex = friendDocument.friends.findIndex(f => f.friendid === userId);
+        const friendUserIndex = friendDocument.friends.findIndex(f => f.friendid === userId);
 
-        // 이미 친구 상태 또는 요청 상태인지 확인
-        if (userFriendIndex !== -1) {
-            const userStatus = user.friends[userFriendIndex].status;
-
-            if (userStatus === 'accepted') {
-                throw new ConflictException('이미 친구가 된 사용자예요!');
-            }
-            if (userStatus === 'pending') {
-                throw new ConflictException('이미 친구 요청을 보냈습니다.');
-            }
+        if (userFriendIndex !== -1 && user.friends[userFriendIndex].status === 'accepted') {
+            throw new ConflictException('이미 친구가 된 사용자예요!');
         }
 
-        // 친구가 이미 나에게 요청을 보낸 상태면 수락 처리
-        if (friendUserFriendIndex !== -1 && friendDocument.friends[friendUserFriendIndex].status === 'pending') {
-            user.friends.push({
-                friendid: friendId,
-                status: 'accepted',
-                who: friendName,
-                createdat: new Date(),
-            });
+        if (userFriendIndex !== -1 && user.friends[userFriendIndex].status === 'pending' && user.friends[userFriendIndex].who === myName) {
+            throw new ConflictException('이미 친구 요청을 보냈습니다.');
+        }
 
-            friendDocument.friends[friendUserFriendIndex].status = 'accepted';
-            friendDocument.friends[friendUserFriendIndex].createdat = new Date();
+        // 상대방이 요청
+        if (friendUserIndex !== -1 && friendDocument.friends[friendUserIndex].status === 'pending' && friendDocument.friends[friendUserIndex].who === friendName) {
+
+            if (userFriendIndex !== -1) {
+                user.friends[userFriendIndex].status = 'accepted';
+                user.friends[userFriendIndex].createdat = new Date();
+            } else {
+                user.friends.push({
+                    friendid: friendId,
+                    status: 'accepted',
+                    who: friendName,
+                    createdat: new Date(),
+                });
+            }
+
+            friendDocument.friends[friendUserIndex].status = 'accepted';
+            friendDocument.friends[friendUserIndex].createdat = new Date();
 
             await user.save();
             await friendDocument.save();
 
-            return { message: '친구 요청을 수락했습니다.' };
+            return { message: '친구 요청 수락' };
         }
 
-        const myName = (await this.userModel.findOne({ userId }).exec()).name;
-
         // 새로운 친구 요청 추가
-        user.friends.push({
-            friendid: friendId,
-            status: 'pending',
-            who: myName,
-            createdat: new Date(),
-        });
+        if (userFriendIndex === -1) {
+            user.friends.push({
+                friendid: friendId,
+                status: 'pending',
+                who: myName,
+                createdat: new Date(),
+            });
+        } else {
+            user.friends[userFriendIndex] = {
+                friendid: friendId,
+                status: 'pending',
+                who: myName,
+                createdat: new Date(),
+            };
+        }
 
-        friendDocument.friends.push({
-            friendid: userId,
-            status: 'pending',
-            who: myName,
-            createdat: new Date(),
-        });
+        if (friendUserIndex === -1) {
+            friendDocument.friends.push({
+                friendid: userId,
+                status: 'pending',
+                who: myName,
+                createdat: new Date(),
+            });
+        } else {
+            friendDocument.friends[friendUserIndex] = {
+                friendid: userId,
+                status: 'pending',
+                who: myName,
+                createdat: new Date(),
+            };
+        }
 
         await user.save();
         await friendDocument.save();
@@ -92,8 +111,49 @@ export class FriendsService {
     }
 
     // 요청 수락
-    async acceptRequest(userid: string, friend: string): Promise<any> {
+    async acceptRequest(userid: string, friendName: string): Promise<{ message: string }> {
+        // friend
+        const friendUser = await this.userModel.findOne({ name: friendName }).exec();
+        if (!friendUser) {
+            throw new ConflictException('Friend not found');
+        }
 
+        const friendId = friendUser.userId;
+
+        // user friends
+        const userDocument = await this.friendModel.findOne({ userid }).exec();
+        if (!userDocument) {
+            throw new ConflictException('User document not found');
+        }
+
+        // 사용자 friends pending
+        const userFriendIndex = userDocument.friends.findIndex(f => f.friendid === friendId && f.status === 'pending');
+        if (userFriendIndex === -1) {
+            throw new ConflictException('해당 친구 요청을 찾을 수 없습니다.');
+        }
+
+        // friend pending
+        const friendDocument = await this.friendModel.findOne({ userid: friendId }).exec();
+        if (!friendDocument) {
+            throw new ConflictException('Friend document not found');
+        }
+
+        const friendUserFriendIndex = friendDocument.friends.findIndex(f => f.friendid === userid && f.status === 'pending');
+        if (friendUserFriendIndex === -1) {
+            throw new ConflictException('해당 친구 요청을 찾을 수 없습니다.');
+        }
+
+        // accepted
+        userDocument.friends[userFriendIndex].status = 'accepted';
+        userDocument.friends[userFriendIndex].createdat = new Date();
+
+        friendDocument.friends[friendUserFriendIndex].status = 'accepted';
+        friendDocument.friends[friendUserFriendIndex].createdat = new Date();
+
+        await userDocument.save();
+        await friendDocument.save();
+
+        return { message: '수락 완료' };
     }
 
     // 삭제
