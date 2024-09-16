@@ -6,6 +6,7 @@ export const FriendSchema = new Schema({
     {
       friendid: { type: String, required: true },
       status: { type: String, enum: ['pending', 'accepted', 'blocked'], default: 'pending' },
+      who: { type: String },
       createdat: { type: Date, default: Date.now },
     },
   ],

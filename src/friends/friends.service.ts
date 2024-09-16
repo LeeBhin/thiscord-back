@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -17,18 +17,18 @@ export class FriendsService {
     async sendRequest(userId: string, friendName: string): Promise<any> {
         const user = await this.friendModel.findOne({ userid: userId }).exec();
         if (!user) {
-            throw new NotFoundException('사용자를 찾을 수 없음');
+            throw new ConflictException('user not found');
         }
 
         const friend = await this.userModel.findOne({ name: friendName }).exec();
         if (!friend) {
-            throw new NotFoundException('친구를 찾을 수 없음');
+            throw new ConflictException('흠, 안 되는군요. 사용자명을 올바르게 입력했는지 확인하세요.');
         }
 
         const friendId = friend.userId;
         const friendDocument = await this.friendModel.findOne({ userid: friendId }).exec();
         if (!friendDocument) {
-            throw new NotFoundException('Friend user document not found');
+            throw new ConflictException('Friend user document not found');
         }
 
         const userFriendIndex = user.friends.findIndex(f => f.friendid === friendId);
@@ -39,7 +39,7 @@ export class FriendsService {
             const userStatus = user.friends[userFriendIndex].status;
 
             if (userStatus === 'accepted') {
-                throw new ConflictException('이미 친구입니다.');
+                throw new ConflictException('이미 친구가 된 사용자예요!');
             }
             if (userStatus === 'pending') {
                 throw new ConflictException('이미 친구 요청을 보냈습니다.');
@@ -51,6 +51,7 @@ export class FriendsService {
             user.friends.push({
                 friendid: friendId,
                 status: 'accepted',
+                who: friendName,
                 createdat: new Date(),
             });
 
@@ -63,23 +64,27 @@ export class FriendsService {
             return { message: '친구 요청을 수락했습니다.' };
         }
 
+        const myName = (await this.userModel.findOne({ userId }).exec()).name;
+
         // 새로운 친구 요청 추가
         user.friends.push({
             friendid: friendId,
             status: 'pending',
+            who: myName,
             createdat: new Date(),
         });
 
         friendDocument.friends.push({
             friendid: userId,
             status: 'pending',
+            who: myName,
             createdat: new Date(),
         });
 
         await user.save();
         await friendDocument.save();
 
-        return { message: '친구 요청을 보냈습니다.' };
+        return { message: `${friendName}에게 성공적으로 친구 요청을 보냈어요.` };
     }
 
     // 요청 수락
@@ -95,7 +100,7 @@ export class FriendsService {
             // 사용자 문서
             const friendDocument = await this.friendModel.findOne({ userid }).exec();
             if (!friendDocument) {
-                throw new NotFoundException('User not found');
+                throw new ConflictException('User not found');
             }
 
             // 상태 accepted 인것만
@@ -114,7 +119,39 @@ export class FriendsService {
 
         } catch (err) {
             console.error(err);
-            throw new NotFoundException('get_friends Error');
+            throw new ConflictException('get_friends Error');
+        }
+    }
+
+    async getPendingFriends(userid: string): Promise<{ name: string, iconColor: string, who: string }[]> {
+        try {
+            // 사용자 문서
+            const friendDocument = await this.friendModel.findOne({ userid }).exec();
+            if (!friendDocument) {
+                throw new ConflictException('User not found');
+            }
+
+            // 상태 pending 인것만
+            const pendingFriends = friendDocument.friends.filter(friend => friend.status === 'pending');
+
+            // userid
+            const friendIds = pendingFriends.map(friend => friend.friendid);
+
+            // name, iconColor
+            const friends = await this.userModel.find({ userId: { $in: friendIds } }).exec();
+
+            return friends.map(friend => {
+                const pendingFriend = pendingFriends.find(pf => pf.friendid === friend.userId);
+                return {
+                    name: friend.name,
+                    iconColor: friend.iconColor,
+                    who: pendingFriend.who
+                };
+            });
+
+        } catch (err) {
+            console.error(err);
+            throw new ConflictException('get_friends Error');
         }
     }
 

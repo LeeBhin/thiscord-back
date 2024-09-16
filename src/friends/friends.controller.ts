@@ -51,4 +51,19 @@ export class FriendsController {
 
         return this.friendsService.getFriends(userId);
     }
+
+    // 대기 친구 조회
+    @Get('pendinglist')
+    async getPendingFriends(@Req() req: Request) {
+        const token = req.cookies['jwtToken'];
+
+        if (!token) {
+            throw new UnauthorizedException('No token provided');
+        }
+
+        const decoded = this.userService.verifyToken(token);
+        const userId = decoded.userId;
+
+        return this.friendsService.getPendingFriends(userId);
+    }
 }

@@ -5,6 +5,7 @@ export interface Friend extends Document {
   readonly friends: {
     friendid: string;
     status: string;
+    who: string;
     createdat: Date;
   }[];
 }
