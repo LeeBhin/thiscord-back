@@ -13,10 +13,10 @@ import { UserModule } from 'src/user/user.module';
             secret: process.env.JWT_SECRET,
             signOptions: { expiresIn: '7d' },
         }),
-        forwardRef(() => UserModule),  // 순환 의존성 문제 해결
+        forwardRef(() => UserModule),
     ],
     providers: [FriendsService],
     controllers: [FriendsController],
     exports: [FriendsService],
 })
-export class FriendsModule {}
+export class FriendsModule { }

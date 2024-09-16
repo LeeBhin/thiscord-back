@@ -31,6 +31,10 @@ export class FriendsService {
             throw new ConflictException('Friend user document not found');
         }
 
+        if (userId === friendId) {
+            throw new ConflictException('자신에게 요청을 보낼 수 없어요.');
+        }
+
         const userFriendIndex = user.friends.findIndex(f => f.friendid === friendId);
         const friendUserFriendIndex = friendDocument.friends.findIndex(f => f.friendid === userId);
 
@@ -88,11 +92,52 @@ export class FriendsService {
     }
 
     // 요청 수락
-    async acceptRequest(userid: string, friendid: string): Promise<any> {
+    async acceptRequest(userid: string, friend: string): Promise<any> {
+
     }
 
     // 삭제
-    async deleteFriend(userid: string, friendid: string): Promise<void> {
+    async deleteFriend(userid: string, friendName: string): Promise<boolean> {
+        try {
+            // 사용자 문서
+            const userDocument = await this.friendModel.findOne({ userid }).exec();
+            if (!userDocument) {
+                throw new ConflictException('User not found');
+            }
+
+            // 친구 userId
+            const friend = await this.userModel.findOne({ name: friendName }).exec();
+            if (!friend) {
+                throw new ConflictException('Friend not found');
+            }
+            const friendId = friend.userId;
+
+            // 사용자 friends 배열 삭제
+            userDocument.friends = userDocument.friends.filter(friendArray =>
+                friendArray.friendid !== friendId
+            );
+
+            // 친구 friends 배열 삭제
+            const friendDocument = await this.friendModel.findOne({ userid: friendId }).exec();
+            if (!friendDocument) {
+                throw new ConflictException('Friend user document not found');
+            }
+            friendDocument.friends = friendDocument.friends.filter(friendArray =>
+                friendArray.friendid !== userid
+            );
+
+            await userDocument.save();
+            await friendDocument.save();
+
+            const success = true;
+
+            return success;
+
+        } catch (err) {
+            console.error(err);
+            throw new ConflictException('delete_friend Error');
+        }
+
     }
 
     async getFriends(userid: string): Promise<{ name: string, iconColor: string }[]> {
