@@ -17,6 +17,18 @@ export class UserService {
         private readonly friendsService: FriendsService,
     ) { }
 
+    async findByName(name: string): Promise<User | null> {
+        return this.userModel.findOne({ name }).exec();
+    }
+
+    async findById(userId: string): Promise<User | null> {
+        const user = await this.userModel.findOne({ userId: userId }).exec();
+        if (!user) {
+            throw new NotFoundException(`User not found`);
+        }
+        return user;
+    }
+
     // 모든 user 조회
     async findAll(): Promise<User[]> {
         return this.userModel.find().exec();
