@@ -97,7 +97,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         if (!receiver) {
             throw new NotFoundException('Receiver not found');
         }
-        const receiverId = receiver.userId; // 수신자의 사용자 ID
+        const receiverId = receiver.userId;
 
         // 채팅방 찾기
         let chatRoom = await this.chatService.findChatRoomByParticipants(senderId, receiverId);

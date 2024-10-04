@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ChatRoom, ChatRoomDocument } from '../schemas/chatRoom.schema';
 import { User } from 'src/schemas/user.schema';
 import { UserService } from 'src/user/user.service';
+import { Request } from 'express';
 
 @Injectable()
 export class ChatService {
@@ -52,5 +53,27 @@ export class ChatService {
         return this.chatRoomModel.findOne({
             participants: { $all: [senderId, receiverId] },
         }).exec();
+    }
+
+    async getChatHistory(req: Request, receiverName: string): Promise<any> {
+        const token = req.cookies['jwtToken'];
+        if (!token) {
+            throw new UnauthorizedException('No token provided');
+        }
+
+        const decoded = this.userService.verifyToken(token);
+        const senderId = decoded.userId;
+
+        const receiverId = await this.userService.findByName(receiverName);
+        if (!receiverId) {
+            throw new Error('Receiver not found');
+        }
+
+        const chatRoom = await this.findChatRoomByParticipants(senderId, receiverId.userId);
+        if (!chatRoom) {
+            throw new Error('Chat room not found');
+        }
+
+        return chatRoom.messages;
     }
 }
