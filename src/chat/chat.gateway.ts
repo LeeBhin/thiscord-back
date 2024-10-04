@@ -99,23 +99,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }
         const receiverId = receiver.userId;
 
-        // 채팅방 찾기
         let chatRoom = await this.chatService.findChatRoomByParticipants(senderId, receiverId);
 
         if (!chatRoom) {
             chatRoom = await this.chatService.createChatRoom([senderId, receiverId]);
         }
 
-        // 저장
         await this.chatService.saveMessage(chatRoom._id.toString(), senderName, message);
 
-        // 참가자에게 채팅 전송
         chatRoom.participants.forEach((participantId) => {
             const receiverSocketId = this.getReceiverSocketId(participantId);
             if (receiverSocketId) {
                 this.server.to(receiverSocketId).emit('message', {
                     message,
-                    senderName,
+                    senderId: senderName,
                     receiverId,
                 });
             }
