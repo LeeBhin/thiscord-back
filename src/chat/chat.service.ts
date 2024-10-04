@@ -71,9 +71,37 @@ export class ChatService {
 
         const chatRoom = await this.findChatRoomByParticipants(senderId, receiverId.userId);
         if (!chatRoom) {
-            throw new Error('Chat room not found');
+            console.log('chatroom not found')
+            this.createChatRoom([senderId, receiverId.userId])
         }
 
         return chatRoom.messages;
+    }
+    async getMyChatrooms(req: Request): Promise<any> {
+        const token = req.cookies['jwtToken'];
+        if (!token) {
+            throw new UnauthorizedException('No token provided');
+        }
+
+        const decoded = this.userService.verifyToken(token);
+        const senderId = decoded.userId;
+
+        const chatRooms = await this.chatRoomModel.find({
+            participants: senderId,
+        });
+
+        const otherParticipants = await Promise.all(chatRooms.map(async (room) => {
+            const otherParticipantId = room.participants.find((participantId) => participantId !== senderId);
+
+            const otherParticipant = await this.userService.findById(otherParticipantId);
+
+            return {
+                participantName: otherParticipant?.name || 'Unknown',
+                iconColor: otherParticipant?.iconColor || '#000000',
+                lastMessageAt: room.lastMessageAt
+            };
+        }));
+
+        return otherParticipants;
     }
 }

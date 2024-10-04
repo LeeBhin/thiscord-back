@@ -4,7 +4,7 @@ import { Request } from 'express';
 
 @Controller('chat')
 export class ChatController {
-    constructor(private readonly chatService: ChatService) {}
+    constructor(private readonly chatService: ChatService) { }
 
     @Get('history/:receiverName')
     async getChatHistory(
@@ -12,5 +12,12 @@ export class ChatController {
         @Param('receiverName') receiverName: string,
     ) {
         return await this.chatService.getChatHistory(req, receiverName);
+    }
+
+    @Get('chatrooms')
+    async getMyChatrooms(
+        @Req() req: Request,
+    ) {
+        return await this.chatService.getMyChatrooms(req);
     }
 }
