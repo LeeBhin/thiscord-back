@@ -72,7 +72,8 @@ export class ChatService {
         const chatRoom = await this.findChatRoomByParticipants(senderId, receiverId.userId);
         if (!chatRoom) {
             console.log('chatroom not found')
-            this.createChatRoom([senderId, receiverId.userId])
+            this.createChatRoom([senderId, receiverId.userId]);
+            return {}
         }
 
         return chatRoom.messages;
