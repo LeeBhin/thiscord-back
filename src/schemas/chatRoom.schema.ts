@@ -18,9 +18,10 @@ export class ChatRoom {
         timestamp: Date;
         isRead: boolean;
         isEdit: boolean;
+        _id?: string;
     }[];
 
-    @Prop({ type: mongoose.Schema.Types.ObjectId, auto: true }) 
+    @Prop({ type: mongoose.Schema.Types.ObjectId, auto: true })
     _id: mongoose.Types.ObjectId;
 
 }

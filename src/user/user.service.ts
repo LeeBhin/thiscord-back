@@ -47,9 +47,8 @@ export class UserService {
     async create(createUserDto: CreateUserDto): Promise<User> {
 
         const colors = [
-            '#5865F2', '#57F287', '#EB459E', '#FEE75C', '#ED4245', '#7289DA', '#FFA500',
-            '#23272A', '#99AAB5', '#3498DB', '#9B59B6', '#1ABC9C', '#E74C3C', '#7F8C8D',
-            '#F39C12', '#C0392B', '#8E44AD', '#2ECC71', '#16A085', '#D35400', '#34495E',
+            '#5865F2', '#57F287', '#EB459E', '#7289DA', '#FFA500',
+            '#3498DB', '#9B59B6', '#1ABC9C', '#E74C3C', '#2ECC71'
         ];
 
         const existingMail = await this.userModel.findOne({ phoneOrEmail: createUserDto.phoneOrEmail }).exec();

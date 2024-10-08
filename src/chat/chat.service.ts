@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ChatRoom, ChatRoomDocument } from '../schemas/chatRoom.schema';
@@ -105,4 +105,43 @@ export class ChatService {
 
         return otherParticipants;
     }
+
+    async deleteMsg(req: Request, msgId: string, senderId: string, receiverName: string): Promise<any> {
+        const token = req.cookies['jwtToken'];
+        if (!token) {
+            throw new UnauthorizedException('No token provided');
+        }
+
+        const decoded = this.userService.verifyToken(token);
+        const userId = decoded.userId;
+
+        const receiverUser = await this.userService.findByName(receiverName);
+        const receiverUserId = receiverUser.userId;
+
+        const sendUser = await this.userService.findByName(senderId);
+        const sendUserId = sendUser.userId;
+
+        if (userId != sendUserId) {
+            return new UnauthorizedException('no access');
+        }
+
+        const chatRoom = await this.chatRoomModel.findOne({
+            participants: { $all: [userId, receiverUserId] }
+        });
+
+        if (!chatRoom) {
+            throw new NotFoundException('Chatroom not found');
+        }
+
+        const index = chatRoom.messages.findIndex((message) => message._id.toString() === msgId);
+        if (index !== -1) {
+            chatRoom.messages.splice(index, 1);
+        }
+
+        await chatRoom.save();
+
+        return { success: true };
+    }
+
+
 }

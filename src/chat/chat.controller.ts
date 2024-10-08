@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Req } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { Request } from 'express';
 
@@ -20,4 +20,11 @@ export class ChatController {
     ) {
         return await this.chatService.getMyChatrooms(req);
     }
+
+    @Delete('delete')
+    async deleteMsg(@Req() req: Request, @Body() body: { msgId: string, senderId: string, receiverName: string }) {
+        const { msgId, senderId, receiverName } = body;
+        return await this.chatService.deleteMsg(req, msgId, senderId, receiverName);
+    }
+
 }
