@@ -50,7 +50,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
             if (userId) {
                 this.clients[userId] = client.id;
-                console.log(`User connected: ${userId} with socket ID: ${client.id}`);
             }
         } catch (error) {
             console.error(`Connection error: ${error.message}`);
@@ -64,9 +63,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         );
         if (userId) {
             delete this.clients[userId];
-            console.log(`User disconnected: ${userId}, Socket ID: ${client.id}`);
         }
-        console.log(`Client disconnected: ${client.id}`);
     }
 
     private getReceiverSocketId(receiverId: string): string | undefined {
@@ -118,4 +115,46 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
             }
         });
     }
+
+    @SubscribeMessage('delete')
+    async handleDelete(
+        @MessageBody() data: { receivedUser: string; },
+        @ConnectedSocket() client: Socket,
+    ): Promise<void> {
+        const cookie = client.handshake.headers.cookie;
+        const token = this.getCookieValue(cookie, 'jwtToken');
+
+        if (!token) {
+            throw new UnauthorizedException('No token provided');
+        }
+
+        const decoded = this.userService.verifyToken(token);
+        const senderId = decoded.userId;
+
+        const sender = await this.userService.findById(senderId);
+        const senderName = sender.name;
+
+        const { receivedUser } = data;
+
+        const receiver = await this.userService.findByName(receivedUser);
+        if (!receiver) {
+            throw new NotFoundException('Receiver not found');
+        }
+        const receiverId = receiver.userId;
+
+        let chatRoom = await this.chatService.findChatRoomByParticipants(senderId, receiverId);
+
+        if (!chatRoom) {
+            chatRoom = await this.chatService.createChatRoom([senderId, receiverId]);
+        }
+
+        chatRoom.participants.forEach((participantId) => {
+            const receiverSocketId = this.getReceiverSocketId(participantId);
+            if (receiverSocketId) {
+                this.server.to(receiverSocketId).emit('delete', {
+                });
+            }
+        });
+    }
+
 }
