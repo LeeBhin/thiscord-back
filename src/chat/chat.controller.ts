@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Req } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { Request } from 'express';
 
@@ -27,4 +27,12 @@ export class ChatController {
         return await this.chatService.deleteMsg(req, msgId, senderId, receiverName);
     }
 
+    @Patch('edit')
+    async editMsg(
+        @Req() req: Request,
+        @Body() body: { msgId: string, senderId: string, receiverName: string, newMsg: string }
+    ) {
+        const { msgId, senderId, receiverName, newMsg } = body;
+        return await this.chatService.editMsg(req, msgId, senderId, receiverName, newMsg);
+    }
 }

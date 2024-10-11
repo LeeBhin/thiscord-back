@@ -143,5 +143,44 @@ export class ChatService {
         return { success: true };
     }
 
+    async editMsg(req: Request, msgId: string, senderId: string, receiverName: string, newMessage: string): Promise<any> {
+        const token = req.cookies['jwtToken'];
+        if (!token) {
+            throw new UnauthorizedException('No token provided');
+        }
+
+        const decoded = this.userService.verifyToken(token);
+        const userId = decoded.userId;
+
+        const receiverUser = await this.userService.findByName(receiverName);
+        const receiverUserId = receiverUser.userId;
+
+        const senderUser = await this.userService.findByName(senderId);
+        const senderUserId = senderUser.userId;
+
+        if (userId !== senderUserId) {
+            throw new UnauthorizedException('No access to edit this message');
+        }
+
+        const chatRoom = await this.chatRoomModel.findOne({
+            participants: { $all: [userId, receiverUserId] }
+        });
+
+        if (!chatRoom) {
+            throw new NotFoundException('Chat room not found');
+        }
+
+        const messageIndex = chatRoom.messages.findIndex((msg) => msg._id.toString() === msgId);
+        if (messageIndex === -1) {
+            throw new NotFoundException('Message not found');
+        }
+
+        chatRoom.messages[messageIndex].message = newMessage;
+        chatRoom.messages[messageIndex].isEdit = true;
+
+        await chatRoom.save();
+        return { success: true };
+    }
+
 
 }
