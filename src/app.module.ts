@@ -7,7 +7,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { FriendsModule } from './friends/friends.module';
 import { ChatModule } from './chat/chat.module';
-import { PushModule } from './push/push.module';
 
 @Module({
   imports: [
@@ -20,7 +19,6 @@ import { PushModule } from './push/push.module';
     UserModule,
     FriendsModule,
     ChatModule,
-    PushModule
   ],
   controllers: [AppController],
   providers: [AppService],

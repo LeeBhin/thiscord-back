@@ -76,7 +76,7 @@ export class FriendsController {
         const decoded = this.userService.verifyToken(token);
         const userId = decoded.userId;
 
-        return this.friendsService.getFriends(userId, req);
+        return this.friendsService.getFriends(userId);
     }
 
     // 대기 친구 조회
@@ -91,6 +91,6 @@ export class FriendsController {
         const decoded = this.userService.verifyToken(token);
         const userId = decoded.userId;
 
-        return this.friendsService.getPendingFriends(userId, req);
+        return this.friendsService.getPendingFriends(userId);
     }
 }
