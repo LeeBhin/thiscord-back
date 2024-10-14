@@ -82,6 +82,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
             throw new UnauthorizedException('No token provided');
         }
 
+
         const decoded = this.userService.verifyToken(token);
         const senderId = decoded.userId;
 

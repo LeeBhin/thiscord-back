@@ -5,12 +5,14 @@ import { ChatRoom, ChatRoomDocument } from '../schemas/chatRoom.schema';
 import { User } from 'src/schemas/user.schema';
 import { UserService } from 'src/user/user.service';
 import { Request } from 'express';
+import { PushService } from 'src/push/push.service';
 
 @Injectable()
 export class ChatService {
     constructor(
         @InjectModel(ChatRoom.name) private chatRoomModel: Model<ChatRoomDocument>,
         private userService: UserService,
+        private pushService: PushService
     ) { }
 
     async findByName(name: string): Promise<User | null> {
@@ -32,6 +34,15 @@ export class ChatService {
         });
 
         chatRoom.lastMessageAt = new Date();
+
+        const recipientId = chatRoom.participants.find(participant => participant !== senderId);
+        const payload = {
+            title: 'msg',
+            body: message,
+            senderName: this.findByName(senderId)
+        }
+
+        this.pushService.sendPushNotification(recipientId, payload);
 
         return chatRoom.save();
     }
@@ -78,6 +89,7 @@ export class ChatService {
 
         return chatRoom.messages;
     }
+
     async getMyChatrooms(req: Request): Promise<any> {
         const token = req.cookies['jwtToken'];
         if (!token) {
@@ -181,6 +193,4 @@ export class ChatService {
         await chatRoom.save();
         return { success: true };
     }
-
-
 }
