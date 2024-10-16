@@ -158,4 +158,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         });
     }
 
+    @SubscribeMessage('friendReq')
+    async handleFriendRequest(@MessageBody() data: { senderId: string }) {
+        this.server.emit('friendRes', {
+        });
+    }
 }
