@@ -99,10 +99,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
         let chatRoom = await this.chatService.findChatRoomByParticipants(senderId, receiverId);
 
-        if (!chatRoom) {
-            chatRoom = await this.chatService.createChatRoom([senderId, receiverId]);
-        }
-
         await this.chatService.saveMessage(chatRoom._id.toString(), senderName, message);
 
         chatRoom.participants.forEach((participantId) => {
@@ -144,10 +140,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         const receiverId = receiver.userId;
 
         let chatRoom = await this.chatService.findChatRoomByParticipants(senderId, receiverId);
-
-        if (!chatRoom) {
-            chatRoom = await this.chatService.createChatRoom([senderId, receiverId]);
-        }
 
         chatRoom.participants.forEach((participantId) => {
             const receiverSocketId = this.getReceiverSocketId(participantId);

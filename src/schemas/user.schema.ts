@@ -22,6 +22,9 @@ export class User {
 
     @Prop()
     iconColor: string;
+
+    @Prop({ default: null })
+    fcmToken: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

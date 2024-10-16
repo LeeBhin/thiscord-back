@@ -17,6 +17,6 @@ import { UserModule } from 'src/user/user.module';
     ],
     providers: [FriendsService],
     controllers: [FriendsController],
-    exports: [FriendsService],
+    exports: [FriendsService, MongooseModule],
 })
 export class FriendsModule { }

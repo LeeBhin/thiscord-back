@@ -5,12 +5,14 @@ import { ChatRoom, ChatRoomDocument } from '../schemas/chatRoom.schema';
 import { User } from 'src/schemas/user.schema';
 import { UserService } from 'src/user/user.service';
 import { Request } from 'express';
+import { Friend } from 'src/interfaces/friend.interface';
 
 @Injectable()
 export class ChatService {
     constructor(
         @InjectModel(ChatRoom.name) private chatRoomModel: Model<ChatRoomDocument>,
-        private userService: UserService
+        private userService: UserService,
+        @InjectModel('Friend') private readonly friendModel: Model<Friend>
     ) { }
 
     async findByName(name: string): Promise<User | null> {
@@ -35,7 +37,23 @@ export class ChatService {
         return chatRoom.save();
     }
 
-    async createChatRoom(participants: string[]): Promise<ChatRoom> {
+    async createChatRoom(userId: string, participants: string[]): Promise<ChatRoom> {
+        const userFriendDocument = await this.friendModel.findOne({ userid: userId }).exec();
+        if (!userFriendDocument) {
+            console.log('User not found');
+        }
+
+        const acceptedFriends = userFriendDocument.friends
+            .filter(friend => friend.status === 'accepted')
+            .map(friend => friend.friendid);
+
+        const invalidParticipants = participants.filter(participant => participant !== userId && !acceptedFriends.includes(participant));
+
+        if (invalidParticipants.length > 0) {
+            console.log('not your friend')
+            return;
+        }
+
         const newChatRoom = new this.chatRoomModel({
             participants,
             messages: [],
@@ -71,7 +89,7 @@ export class ChatService {
         const chatRoom = await this.findChatRoomByParticipants(senderId, receiverId.userId);
         if (!chatRoom) {
             console.log('chatroom not found')
-            this.createChatRoom([senderId, receiverId.userId]);
+            this.createChatRoom(senderId, [senderId, receiverId.userId]);
             return {}
         }
 

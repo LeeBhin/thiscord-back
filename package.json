@@ -34,6 +34,7 @@
     "bcrypt": "^5.1.1",
     "cookie-parser": "^1.4.6",
     "dotenv": "^16.4.5",
+    "firebase-admin": "^12.6.0",
     "mongoose": "^8.6.1",
     "nest": "^0.1.6",
     "passport": "^0.7.0",
