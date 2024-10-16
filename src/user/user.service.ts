@@ -110,6 +110,28 @@ export class UserService {
         return { userInfo, token };
     }
 
+    async updateUserName(userId: string, newName: string): Promise<any> {
+        console.log(userId, newName)
+        const existingName = await this.userModel.findOne({ name: new RegExp(`^${newName}$`, 'i') }).exec();
+        if (existingName) {
+            return '이미 사용중인 이름입니다.'
+        }
+
+        const updatedUser = await this.userModel.findOneAndUpdate(
+            { userId: userId },
+            { name: newName },
+            { new: true }
+        ).exec();
+
+        if (!updatedUser) {
+            console.log('사용자를 찾을 수 없습니다.');
+        }
+
+        const result = updatedUser.name
+
+        return result;
+    }
+
     verifyToken(token: string): any {
         try {
             const decoded = this.jwtService.verify(token, {

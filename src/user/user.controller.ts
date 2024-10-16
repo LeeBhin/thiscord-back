@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Req, Res, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Req, Res, HttpStatus, Patch } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { LoginDto } from '../dto/login.dto';
@@ -54,6 +54,24 @@ export class UserController {
         });
 
         return res.status(HttpStatus.OK).json({ message: '로그아웃되었습니다.' });
+    }
+
+    @Patch('update-name')
+    async updateUserName(@Req() req: Request, @Body() body: { newName: string }) {
+        const token = req.cookies['jwtToken'];
+        if (!token) {
+            console.log('No token provided');
+        }
+
+        const decoded = this.userService.verifyToken(token);
+        const userId = decoded.userId;
+
+        const { newName } = body;
+        const updatedUser = await this.userService.updateUserName(userId, newName);
+
+        return {
+            updatedUser,
+        };
     }
 
     @Post('check-token')
