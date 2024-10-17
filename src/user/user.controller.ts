@@ -96,7 +96,7 @@ export class UserController {
     async deleteUser(@Req() req: Request, @Res() res: Response) {
         const token = req.cookies['jwtToken'];
         if (!token) {
-            return res.status(401).json({ message: 'No token provided' });
+            console.log('No token provided');
         }
 
         const { password } = req.body;
@@ -122,7 +122,6 @@ export class UserController {
         const token = req.cookies['jwtToken'];
 
         if (!token) {
-            console.log('No token found');
             return res.status(HttpStatus.UNAUTHORIZED).json({ message: 'No token found' });
         }
 
@@ -130,7 +129,6 @@ export class UserController {
             this.userService.verifyToken(token);
             return res.status(HttpStatus.OK).json({ message: 'Token is valid' });
         } catch (error) {
-            console.log('Token verification failed:', error.message);
             return res.status(HttpStatus.UNAUTHORIZED).json({ message: 'Invalid token' });
         }
     }

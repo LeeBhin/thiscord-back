@@ -6,7 +6,6 @@ import { CreateUserDto } from '../dto/create-user.dto';
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { error } from 'console';
 import { FriendsService } from 'src/friends/friends.service';
 import * as crypto from 'crypto';
 
@@ -148,12 +147,12 @@ export class UserService {
 
         const user = await this.userModel.findOneAndUpdate(
             { userId },
-            { name: newName, fcmToken: 'deletedUser' },
+            { name: newName, fcmToken: 'deletedUser', phoneOrEmail: '', password: '' },
             { new: true } // 새로운 값을 반환
         );
 
         if (!user) {
-            throw new Error('User not found');
+            throw new ConflictException('User not found');
         }
 
         return newName;
@@ -162,7 +161,7 @@ export class UserService {
     async validatePassword(userId: string, password: string): Promise<boolean> {
         const user = await this.userModel.findOne({ userId });
         if (!user) {
-            throw new Error('User not found');
+            throw new ConflictException('User not found');
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
@@ -176,7 +175,7 @@ export class UserService {
             });
             return decoded
         } catch (err) {
-            throw new error(err);
+            throw new ConflictException(err);
         }
     }
 }

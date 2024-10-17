@@ -98,8 +98,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         const receiverId = receiver.userId;
 
         let chatRoom = await this.chatService.findChatRoomByParticipants(senderId, receiverId);
-
-        await this.chatService.saveMessage(chatRoom._id.toString(), senderName, message);
+        const saveSenderId = (await this.userService.findByName(senderName)).userId
+        await this.chatService.saveMessage(chatRoom._id.toString(), saveSenderId, message);
 
         chatRoom.participants.forEach((participantId) => {
             const receiverSocketId = this.getReceiverSocketId(participantId);

@@ -93,7 +93,10 @@ export class ChatService {
             return {}
         }
 
-        return chatRoom.messages;
+        return {
+            messages: chatRoom.messages,
+            senderId: senderId
+        };
     }
 
     async getMyChatrooms(req: Request): Promise<any> {
@@ -136,10 +139,7 @@ export class ChatService {
         const receiverUser = await this.userService.findByName(receiverName);
         const receiverUserId = receiverUser.userId;
 
-        const sendUser = await this.userService.findByName(senderId);
-        const sendUserId = sendUser.userId;
-
-        if (userId != sendUserId) {
+        if (userId != userId) {
             return new UnauthorizedException('no access');
         }
 
@@ -173,10 +173,7 @@ export class ChatService {
         const receiverUser = await this.userService.findByName(receiverName);
         const receiverUserId = receiverUser.userId;
 
-        const senderUser = await this.userService.findByName(senderId);
-        const senderUserId = senderUser.userId;
-
-        if (userId !== senderUserId) {
+        if (userId !== senderId) {
             throw new UnauthorizedException('No access to edit this message');
         }
 
