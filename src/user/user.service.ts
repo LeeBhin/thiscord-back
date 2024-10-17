@@ -144,11 +144,12 @@ export class UserService {
     async deleteUser(userId: string): Promise<string> {
         const randomSuffix = crypto.randomBytes(3).toString('hex');
         const newName = `Deleted User ${randomSuffix}`;
+        const timestamp = new Date().getTime();
 
         const user = await this.userModel.findOneAndUpdate(
             { userId },
-            { name: newName, fcmToken: 'deletedUser', phoneOrEmail: '', password: '' },
-            { new: true } // 새로운 값을 반환
+            { name: newName, fcmToken: 'deletedUser', phoneOrEmail: `deleted_${userId}_${randomSuffix}_${timestamp}_${newName}`, password: '' },
+            { new: true }
         );
 
         if (!user) {

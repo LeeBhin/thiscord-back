@@ -111,9 +111,9 @@ export class UserController {
             }
 
             const deletedUserName = await this.userService.deleteUser(userId);
-            return res.status(200).json({ message: `User renamed to ${deletedUserName}` });
+            return res.status(200).json({ message: `User deleted` });
         } catch (error) {
-            return res.status(500).json({ message: 'An error occurred while deleting the user', error });
+            return res.status(500).json({ message: error });
         }
     }
 
