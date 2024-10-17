@@ -92,6 +92,31 @@ export class UserController {
         };
     }
 
+    @Patch('/delete/delete-user')
+    async deleteUser(@Req() req: Request, @Res() res: Response) {
+        const token = req.cookies['jwtToken'];
+        if (!token) {
+            return res.status(401).json({ message: 'No token provided' });
+        }
+
+        const { password } = req.body;
+
+        try {
+            const decoded = this.userService.verifyToken(token);
+            const userId = decoded.userId;
+
+            const isPasswordValid = await this.userService.validatePassword(userId, password);
+            if (!isPasswordValid) {
+                return res.status(403).json({ message: 'Invalid password' });
+            }
+
+            const deletedUserName = await this.userService.deleteUser(userId);
+            return res.status(200).json({ message: `User renamed to ${deletedUserName}` });
+        } catch (error) {
+            return res.status(500).json({ message: 'An error occurred while deleting the user', error });
+        }
+    }
+
     @Post('check-token')
     async checkToken(@Req() req: Request, @Res() res: Response) {
         const token = req.cookies['jwtToken'];

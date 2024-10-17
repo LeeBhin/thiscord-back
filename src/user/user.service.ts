@@ -8,6 +8,7 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { error } from 'console';
 import { FriendsService } from 'src/friends/friends.service';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class UserService {
@@ -88,6 +89,10 @@ export class UserService {
             throw new ConflictException('로그인 정보가 일치하지 않습니다.');
         }
 
+        if (user.fcmToken === 'deletedUser') {
+            throw new ConflictException('로그인 정보가 일치하지 않습니다.');
+        }
+
         const payload = {
             username: user.name,
             iconColor: user.iconColor,
@@ -137,6 +142,32 @@ export class UserService {
         return user;
     }
 
+    async deleteUser(userId: string): Promise<string> {
+        const randomSuffix = crypto.randomBytes(3).toString('hex');
+        const newName = `Deleted User ${randomSuffix}`;
+
+        const user = await this.userModel.findOneAndUpdate(
+            { userId },
+            { name: newName, fcmToken: 'deletedUser' },
+            { new: true } // 새로운 값을 반환
+        );
+
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        return newName;
+    }
+
+    async validatePassword(userId: string, password: string): Promise<boolean> {
+        const user = await this.userModel.findOne({ userId });
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        return isMatch;
+    }
 
     verifyToken(token: string): any {
         try {
