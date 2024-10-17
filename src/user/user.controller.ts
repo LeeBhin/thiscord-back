@@ -14,11 +14,11 @@ export class UserController {
         return this.userService.findAll();
     }
 
-    // 특정 user id
-    @Get(':id')
-    async findOne(@Param('id') id: string) {
-        return this.userService.findOne(id);
-    }
+    // // 특정 user id
+    // @Get(':id')
+    // async findOne(@Param('id') id: string) {
+    //     return this.userService.findOne(id);
+    // }
 
     // user 생성
     @Post('register')
@@ -54,6 +54,24 @@ export class UserController {
         });
 
         return res.status(HttpStatus.OK).json({ message: '로그아웃되었습니다.' });
+    }
+
+    @Get('myinfo')
+    async getMyInfo(@Req() req: Request, @Res() res: Response) {
+        const token = req.cookies['jwtToken'];
+        if (!token) {
+            console.log('No token provided');
+        }
+
+        const decoded = this.userService.verifyToken(token);
+        const userId = decoded.userId;
+
+
+        const userInfo = await this.userService.myInfo(userId);
+        return res.json({
+            name: userInfo.name,
+            iconColor: userInfo.iconColor,
+        });
     }
 
     @Patch('update-name')

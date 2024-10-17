@@ -36,12 +36,9 @@ export class UserService {
 
     // 특정 user 조회
     async findOne(id: string): Promise<User | null> {
-        if (!Types.ObjectId.isValid(id)) {
-            console.log('id :', id)
-            throw new Error('Invalid ObjectId format');
-        }
-        return this.userModel.findById(id).exec();
+        return this.userModel.findOne({ userId: id }).exec();
     }
+
 
     // 새로운 user 생성
     async create(createUserDto: CreateUserDto): Promise<User> {
@@ -111,7 +108,6 @@ export class UserService {
     }
 
     async updateUserName(userId: string, newName: string): Promise<any> {
-        console.log(userId, newName)
         const existingName = await this.userModel.findOne({ name: new RegExp(`^${newName}$`, 'i') }).exec();
         if (existingName) {
             return '이미 사용중인 이름입니다.'
@@ -131,6 +127,16 @@ export class UserService {
 
         return result;
     }
+
+    async myInfo(userId: string): Promise<{ name: string, iconColor: string } | null> {
+        const user = await this.userModel.findOne({ userId }).exec();
+
+        if (!user) {
+            console.log('user not found')
+        }
+        return user;
+    }
+
 
     verifyToken(token: string): any {
         try {
