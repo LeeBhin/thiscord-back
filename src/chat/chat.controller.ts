@@ -35,4 +35,14 @@ export class ChatController {
         const { msgId, senderId, receiverName, newMsg } = body;
         return await this.chatService.editMsg(req, msgId, senderId, receiverName, newMsg);
     }
+
+    @Patch('messages/read')
+    async markMessageAsRead(
+        @Req() req: Request,
+        @Body('msgId') msgId: string,
+        @Body('receiverName') receiverName: string,
+    ): Promise<any> {
+        return this.chatService.readMessage(req, msgId, receiverName);
+    }
+
 }
