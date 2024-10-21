@@ -71,6 +71,7 @@ export class UserController {
         return res.json({
             name: userInfo.name,
             iconColor: userInfo.iconColor,
+            userId
         });
     }
 

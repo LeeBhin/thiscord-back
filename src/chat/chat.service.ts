@@ -231,7 +231,7 @@ export class ChatService {
         if (chatRoom.messages[messageIndex]) {
             chatRoom.messages[messageIndex].isRead[userId] = true;
         }
-
+        chatRoom.markModified(`messages.${messageIndex}.isRead`);
         await chatRoom.save();
         return { success: true };
     }
