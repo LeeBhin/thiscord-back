@@ -1,35 +1,39 @@
-import { Body, Controller, Delete, Get, Param, Patch, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Request, Query } from '@nestjs/common';
 import { ChatService } from './chat.service';
-import { Request } from 'express';
+import { Request as ExpressRequest } from 'express';
 
 @Controller('chat')
 export class ChatController {
     constructor(private readonly chatService: ChatService) { }
 
-    @Get('history/:receiverName')
+    @Get('history')
     async getChatHistory(
-        @Req() req: Request,
-        @Param('receiverName') receiverName: string,
+        @Request() req: ExpressRequest,
+        @Query('receiverName') receiverName: string,
+        @Query('lastReadMsgId') lastReadMsgId?: string,
     ) {
-        return await this.chatService.getChatHistory(req, receiverName);
+        return await this.chatService.getChatHistory(req, receiverName, lastReadMsgId);
     }
 
     @Get('chatrooms')
     async getMyChatrooms(
-        @Req() req: Request,
+        @Request() req: ExpressRequest,
     ) {
         return await this.chatService.getMyChatrooms(req);
     }
 
     @Delete('delete')
-    async deleteMsg(@Req() req: Request, @Body() body: { msgId: string, senderId: string, receiverName: string }) {
+    async deleteMsg(
+        @Request() req: ExpressRequest,
+        @Body() body: { msgId: string, senderId: string, receiverName: string }
+    ) {
         const { msgId, senderId, receiverName } = body;
         return await this.chatService.deleteMsg(req, msgId, senderId, receiverName);
     }
 
     @Patch('edit')
     async editMsg(
-        @Req() req: Request,
+        @Request() req: ExpressRequest,
         @Body() body: { msgId: string, senderId: string, receiverName: string, newMsg: string }
     ) {
         const { msgId, senderId, receiverName, newMsg } = body;
@@ -38,11 +42,10 @@ export class ChatController {
 
     @Patch('messages/read')
     async markMessageAsRead(
-        @Req() req: Request,
-        @Body('msgId') msgId: string,
-        @Body('receiverName') receiverName: string,
-    ): Promise<any> {
+        @Request() req: ExpressRequest,
+        @Body() body: { msgId: string, receiverName: string }
+    ) {
+        const { msgId, receiverName } = body;
         return this.chatService.readMessage(req, msgId, receiverName);
     }
-
 }

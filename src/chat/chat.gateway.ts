@@ -82,7 +82,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
             throw new UnauthorizedException('No token provided');
         }
 
-
         const decoded = this.userService.verifyToken(token);
         const senderId = decoded.userId;
 
@@ -98,16 +97,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         const receiverId = receiver.userId;
 
         let chatRoom = await this.chatService.findChatRoomByParticipants(senderId, receiverId);
-        const saveSenderId = (await this.userService.findByName(senderName)).userId
-        await this.chatService.saveMessage(chatRoom._id.toString(), saveSenderId, receiverId, message);
+        await this.chatService.saveMessage(chatRoom._id.toString(), senderId, receiverId, message);
 
         chatRoom.participants.forEach((participantId) => {
             const receiverSocketId = this.getReceiverSocketId(participantId);
             if (receiverSocketId) {
                 this.server.to(receiverSocketId).emit('message', {
-                    message,
-                    senderId: senderName,
-                    receiverId,
                 });
             }
         });

@@ -7,6 +7,8 @@ import { UserService } from 'src/user/user.service';
 import { Request } from 'express';
 import { Friend } from 'src/interfaces/friend.interface';
 
+const PAGE_SIZE = 5;
+
 @Injectable()
 export class ChatService {
     constructor(
@@ -78,7 +80,7 @@ export class ChatService {
         }).exec();
     }
 
-    async getChatHistory(req: Request, receiverName: string): Promise<any> {
+    async getChatHistory(req: Request, receiverName: string, lastReadMsgId?: string): Promise<any> {
         const token = req.cookies['jwtToken'];
         if (!token) {
             throw new UnauthorizedException('No token provided');
@@ -87,21 +89,64 @@ export class ChatService {
         const decoded = this.userService.verifyToken(token);
         const senderId = decoded.userId;
 
-        const receiverId = await this.userService.findByName(receiverName);
-        if (!receiverId) {
+        const receiver = await this.userService.findByName(receiverName);
+        if (!receiver) {
             throw new Error('Receiver not found');
         }
 
-        const chatRoom = await this.findChatRoomByParticipants(senderId, receiverId.userId);
+        const chatRoom = await this.findChatRoomByParticipants(senderId, receiver.userId);
         if (!chatRoom) {
-            console.log('chatroom not found')
-            this.createChatRoom(senderId, [senderId, receiverId.userId]);
-            return {}
+            await this.createChatRoom(senderId, [senderId, receiver.userId]);
+            return {
+                messages: [],
+                hasMore: false,
+                senderId
+            };
+        }
+
+        let messages;
+        let hasMore = false;
+
+        if (lastReadMsgId) {
+            const lastReadIndex = chatRoom.messages.findIndex(
+                msg => msg._id.toString() === lastReadMsgId
+            );
+
+            if (lastReadIndex === -1) {
+                throw new NotFoundException('Last read message not found');
+            }
+
+            const startIndex = Math.max(0, lastReadIndex - PAGE_SIZE);
+            const endIndex = Math.min(chatRoom.messages.length, lastReadIndex + PAGE_SIZE);
+
+            messages = chatRoom.messages.slice(startIndex, endIndex);
+            hasMore = startIndex > 0 || endIndex < chatRoom.messages.length;
+        } else {
+            const lastReadMessage = chatRoom.messages
+                .filter(msg => msg.isRead[senderId])
+                .pop();
+
+            if (lastReadMessage) {
+                const lastReadIndex = chatRoom.messages.findIndex(
+                    msg => msg._id.toString() === lastReadMessage._id.toString()
+                );
+
+                const startIndex = Math.max(0, lastReadIndex - PAGE_SIZE);
+                const endIndex = Math.min(chatRoom.messages.length, lastReadIndex + PAGE_SIZE);
+
+                messages = chatRoom.messages.slice(startIndex, endIndex);
+                hasMore = startIndex > 0 || endIndex < chatRoom.messages.length;
+            } else {
+                messages = chatRoom.messages.slice(-PAGE_SIZE);
+                hasMore = chatRoom.messages.length > PAGE_SIZE;
+            }
         }
 
         return {
-            messages: chatRoom.messages,
-            senderId: senderId
+            messages,
+            hasMore,
+            senderId,
+            totalCount: chatRoom.messages.length
         };
     }
 
@@ -231,8 +276,10 @@ export class ChatService {
         if (chatRoom.messages[messageIndex]) {
             chatRoom.messages[messageIndex].isRead[userId] = true;
         }
+
         chatRoom.markModified(`messages.${messageIndex}.isRead`);
         await chatRoom.save();
+
         return { success: true };
     }
 
