@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
 import { ChatRoom, ChatRoomDocument } from '../schemas/chatRoom.schema';
@@ -7,7 +7,7 @@ import { UserService } from 'src/user/user.service';
 import { Request } from 'express';
 import { Friend } from 'src/interfaces/friend.interface';
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 30;
 
 @Injectable()
 export class ChatService {
@@ -80,7 +80,7 @@ export class ChatService {
         }).exec();
     }
 
-    async getChatHistory(req: Request, receiverName: string, lastReadMsgId?: string): Promise<any> {
+    async getChatHistory(req: Request, receiverName: string, lastReadMsgId?: string, direction?: string): Promise<any> {
         const token = req.cookies['jwtToken'];
         if (!token) {
             throw new UnauthorizedException('No token provided');
@@ -91,13 +91,14 @@ export class ChatService {
 
         const receiver = await this.userService.findByName(receiverName);
         if (!receiver) {
-            throw new Error('Receiver not found');
+            return { message: 'receiver not found', messages: [], hasMore: false };
         }
 
         const chatRoom = await this.findChatRoomByParticipants(senderId, receiver.userId);
         if (!chatRoom) {
             await this.createChatRoom(senderId, [senderId, receiver.userId]);
             return {
+                message: 'chatroom not found',
                 messages: [],
                 hasMore: false,
                 senderId
@@ -106,6 +107,9 @@ export class ChatService {
 
         let messages;
         let hasMore = false;
+
+        if (lastReadMsgId === chatRoom.messages.at(-1)._id.toString()) return { message: 'last message', messages: [], hasMore: false };
+        if (lastReadMsgId === chatRoom.messages.at(0)._id.toString()) return { message: 'first message', messages: [], hasMore: false };
 
         if (lastReadMsgId) {
             const lastReadIndex = chatRoom.messages.findIndex(
@@ -116,16 +120,32 @@ export class ChatService {
                 throw new NotFoundException('Last read message not found');
             }
 
-            const startIndex = Math.max(0, lastReadIndex - PAGE_SIZE);
-            const endIndex = Math.min(chatRoom.messages.length, lastReadIndex + PAGE_SIZE);
+            let startIndex, endIndex;
+
+            if (direction === 'up') {
+                startIndex = Math.max(0, lastReadIndex - PAGE_SIZE);
+                endIndex = lastReadIndex;
+            } else if (direction === 'down') {
+                startIndex = lastReadIndex + 1;
+                endIndex = Math.min(chatRoom.messages.length, startIndex + PAGE_SIZE);
+            } else {
+                throw new BadRequestException('Invalid direction specified');
+            }
 
             messages = chatRoom.messages.slice(startIndex, endIndex);
             hasMore = startIndex > 0 || endIndex < chatRoom.messages.length;
+
+            return {
+                messages,
+                hasMore,
+                senderId,
+                totalCount: chatRoom.messages.length
+            };
+
         } else {
             const lastReadMessage = chatRoom.messages
                 .filter(msg => msg.isRead[senderId])
                 .pop();
-
             if (lastReadMessage) {
                 const lastReadIndex = chatRoom.messages.findIndex(
                     msg => msg._id.toString() === lastReadMessage._id.toString()
@@ -134,20 +154,26 @@ export class ChatService {
                 const startIndex = Math.max(0, lastReadIndex - PAGE_SIZE);
                 const endIndex = Math.min(chatRoom.messages.length, lastReadIndex + PAGE_SIZE);
 
-                messages = chatRoom.messages.slice(startIndex, endIndex);
+                if (direction) {
+                    messages = chatRoom.messages.slice(startIndex, endIndex)
+                        .filter(msg => msg._id.toString() !== lastReadMessage._id.toString());
+                } else {
+                    messages = chatRoom.messages.slice(startIndex, endIndex);
+                }
+
                 hasMore = startIndex > 0 || endIndex < chatRoom.messages.length;
             } else {
                 messages = chatRoom.messages.slice(-PAGE_SIZE);
                 hasMore = chatRoom.messages.length > PAGE_SIZE;
             }
-        }
 
-        return {
-            messages,
-            hasMore,
-            senderId,
-            totalCount: chatRoom.messages.length
-        };
+            return {
+                messages,
+                hasMore,
+                senderId,
+                totalCount: chatRoom.messages.length
+            };
+        }
     }
 
     async getMyChatrooms(req: Request): Promise<any> {

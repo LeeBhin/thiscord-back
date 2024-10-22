@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Patch, Request, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Request, Query, Post } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { Request as ExpressRequest } from 'express';
 
@@ -6,13 +6,16 @@ import { Request as ExpressRequest } from 'express';
 export class ChatController {
     constructor(private readonly chatService: ChatService) { }
 
-    @Get('history')
+    @Post('history')
     async getChatHistory(
         @Request() req: ExpressRequest,
-        @Query('receiverName') receiverName: string,
-        @Query('lastReadMsgId') lastReadMsgId?: string,
+        @Body() body: {
+            receiverName: string;
+            lastReadMsgId?: string;
+            direction?: string;
+        },
     ) {
-        return await this.chatService.getChatHistory(req, receiverName, lastReadMsgId);
+        return await this.chatService.getChatHistory(req, body.receiverName, body.lastReadMsgId, body.direction);
     }
 
     @Get('chatrooms')
