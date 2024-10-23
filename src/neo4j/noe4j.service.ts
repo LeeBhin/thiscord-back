@@ -1,18 +1,24 @@
-// neo4j.service.ts
-import { Injectable, Inject } from '@nestjs/common';
-import { Driver } from 'neo4j-driver';
+import { Injectable, Inject, OnApplicationShutdown } from '@nestjs/common';
+import { NEO4J_CONNECTION } from './neo4j.constants';
+import { Connection } from 'cypher-query-builder';
 
 @Injectable()
-export class Neo4jService {
-  constructor(@Inject('NEO4J_DRIVER') private readonly driver: Driver) {}
+export class QueryRepository {
+  constructor(
+    @Inject(NEO4J_CONNECTION)
+    private readonly connection: Connection,
+  ) { }
 
-  async runQuery(query: string) {
-    const session = this.driver.session();
-    try {
-      const result = await session.run(query);
-      return result.records.map(record => record.get(0));
-    } finally {
-      await session.close();
-    }
+  async createHelloWorldNode() {
+    const query = this.connection.query().raw(`
+      CREATE (n:Greeting {message: 'hello world'})
+      RETURN n
+    `);
+
+    return await query.run();
+  }
+
+  onApplicationShutdown() {
+    this.connection.close();
   }
 }
