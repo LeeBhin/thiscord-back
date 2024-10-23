@@ -11,6 +11,7 @@ import { Server, Socket } from 'socket.io';
 import { ChatService } from './chat.service';
 import { UserService } from 'src/user/user.service';
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
+import mongoose from 'mongoose';
 
 @WebSocketGateway({
     cors: {
@@ -72,61 +73,59 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     @SubscribeMessage('message')
     async handleMessage(
-        @MessageBody() data: { receivedUser: string; message: string },
+        @MessageBody() data: { receivedUser: string; message: string; timestamp: string },
         @ConnectedSocket() client: Socket,
     ): Promise<void> {
-        const cookie = client.handshake.headers.cookie;
-        const token = this.getCookieValue(cookie, 'jwtToken');
-
-        if (!token) {
-            throw new UnauthorizedException('No token provided');
-        }
-
-        const decoded = this.userService.verifyToken(token);
-        const senderId = decoded.userId;
-
-        const sender = await this.userService.findById(senderId);
-        const senderName = sender.name;
-
-        const { receivedUser, message } = data;
-
-        const receiver = await this.userService.findByName(receivedUser);
-        if (!receiver) {
-            throw new NotFoundException('Receiver not found');
-        }
-        const receiverId = receiver.userId;
+        const { senderId, receiverId } = await this.getUserIds(client, data.receivedUser);
 
         let chatRoom = await this.chatService.findChatRoomByParticipants(senderId, receiverId);
-        await this.chatService.saveMessage(chatRoom._id.toString(), senderId, receiverId, message);
 
-        chatRoom.participants.forEach((participantId) => {
-            const receiverSocketId = this.getReceiverSocketId(participantId);
-            if (receiverSocketId) {
-                this.server.to(receiverSocketId).emit('message', {
-                });
-            }
+        const messageId = new mongoose.Types.ObjectId();
+
+        await this.chatService.saveMessage(chatRoom._id.toString(), senderId, receiverId, data.message, messageId);
+
+        this.emitToParticipants(chatRoom.participants, 'message', {
+            receiverId,
+            message: data.message,
+            senderId,
+            timestamp: data.timestamp,
+            isRead: {
+                [senderId]: true,
+                [receiverId]: false
+            },
+            _id: messageId
         });
     }
 
     @SubscribeMessage('delete')
     async handleDelete(
-        @MessageBody() data: { receivedUser: string; },
+        @MessageBody() data: { receivedUser: string; msgId: string; },
         @ConnectedSocket() client: Socket,
     ): Promise<void> {
-        const cookie = client.handshake.headers.cookie;
-        const token = this.getCookieValue(cookie, 'jwtToken');
+        const { senderId, receiverId } = await this.getUserIds(client, data.receivedUser);
 
-        if (!token) {
-            throw new UnauthorizedException('No token provided');
-        }
+        let chatRoom = await this.chatService.findChatRoomByParticipants(senderId, receiverId);
+        this.emitToParticipants(chatRoom.participants, 'delete', { msgId: data.msgId });
+    }
 
+    @SubscribeMessage('edit')
+    async handleEdit(
+        @MessageBody() data: { receivedUser: string; msgId: string; message: string; },
+        @ConnectedSocket() client: Socket,
+    ): Promise<void> {
+        const { senderId, receiverId } = await this.getUserIds(client, data.receivedUser);
+
+        let chatRoom = await this.chatService.findChatRoomByParticipants(senderId, receiverId);
+        this.emitToParticipants(chatRoom.participants, 'edit', {
+            msgId: data.msgId,
+            message: data.message
+        });
+    }
+
+    private async getUserIds(client: Socket, receivedUser: string) {
+        const token = this.getTokenFromCookie(client);
         const decoded = this.userService.verifyToken(token);
         const senderId = decoded.userId;
-
-        const sender = await this.userService.findById(senderId);
-        const senderName = sender.name;
-
-        const { receivedUser } = data;
 
         const receiver = await this.userService.findByName(receivedUser);
         if (!receiver) {
@@ -134,13 +133,23 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }
         const receiverId = receiver.userId;
 
-        let chatRoom = await this.chatService.findChatRoomByParticipants(senderId, receiverId);
+        return { senderId, receiverId };
+    }
 
-        chatRoom.participants.forEach((participantId) => {
+    private getTokenFromCookie(client: Socket): string {
+        const cookie = client.handshake.headers.cookie;
+        const token = this.getCookieValue(cookie, 'jwtToken');
+        if (!token) {
+            throw new UnauthorizedException('No token provided');
+        }
+        return token;
+    }
+
+    private emitToParticipants(participants: string[], event: string, data: any) {
+        participants.forEach((participantId) => {
             const receiverSocketId = this.getReceiverSocketId(participantId);
             if (receiverSocketId) {
-                this.server.to(receiverSocketId).emit('delete', {
-                });
+                this.server.to(receiverSocketId).emit(event, data);
             }
         });
     }

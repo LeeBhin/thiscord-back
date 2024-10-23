@@ -13,9 +13,10 @@ export class ChatController {
             receiverName: string;
             lastReadMsgId?: string;
             direction?: string;
+            pageSize?: number;
         },
     ) {
-        return await this.chatService.getChatHistory(req, body.receiverName, body.lastReadMsgId, body.direction);
+        return await this.chatService.getChatHistory(req, body.receiverName, body.lastReadMsgId, body.direction, body.pageSize);
     }
 
     @Get('chatrooms')
