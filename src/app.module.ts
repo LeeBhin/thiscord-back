@@ -8,6 +8,10 @@ import { AppService } from './app.service';
 import { FriendsModule } from './friends/friends.module';
 import { ChatModule } from './chat/chat.module';
 import { Neo4jModule } from './neo4j/neo4j.module';
+import { AppResolver } from './app.resolver';
+import { GraphQLModule } from '@nestjs/graphql';
+import { ApolloDriver } from '@nestjs/apollo';
+import { QueryRepository } from './neo4j/noe4j.service';
 
 @Module({
   imports: [
@@ -20,9 +24,13 @@ import { Neo4jModule } from './neo4j/neo4j.module';
     UserModule,
     FriendsModule,
     ChatModule,
-    Neo4jModule
+    Neo4jModule.forRootAsync(),
+    GraphQLModule.forRoot({
+      driver: ApolloDriver,
+      autoSchemaFile: true,
+    }),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, AppResolver, QueryRepository],
 })
 export class AppModule { }
