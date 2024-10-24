@@ -46,6 +46,16 @@ export class ChatService {
     }
 
     async createChatRoom(userId: string, participants: string[]): Promise<ChatRoom> {
+
+        const existingChatRoom = await this.chatRoomModel.findOne({
+            participants: { $all: participants }
+        }).exec();
+
+        if (existingChatRoom) {
+            console.log('Chat room already exists');
+            return null;
+        }
+
         const userFriendDocument = await this.friendModel.findOne({ userid: userId }).exec();
         if (!userFriendDocument) {
             console.log('User not found');
@@ -173,9 +183,8 @@ export class ChatService {
                 const startIndex = Math.max(0, lastReadIndex - 70);
 
                 const endIndex = chatRoom.messages.length;
-
                 messages = [
-                    ...chatRoom.messages.slice(startIndex, lastReadIndex),
+                    ...chatRoom.messages.slice(startIndex, lastReadIndex + 1),
                     ...chatRoom.messages.slice(lastReadIndex + 1, endIndex)
                 ];
             } else {
