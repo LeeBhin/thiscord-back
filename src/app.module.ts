@@ -10,7 +10,7 @@ import { ChatModule } from './chat/chat.module';
 import { Neo4jModule } from './neo4j/neo4j.module';
 import { AppResolver } from './app.resolver';
 import { GraphQLModule } from '@nestjs/graphql';
-import { ApolloDriver } from '@nestjs/apollo';
+import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { QueryRepository } from './neo4j/noe4j.service';
 
 @Module({
@@ -25,7 +25,7 @@ import { QueryRepository } from './neo4j/noe4j.service';
     FriendsModule,
     ChatModule,
     Neo4jModule.forRootAsync(),
-    GraphQLModule.forRoot({
+    GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: true,
     }),
