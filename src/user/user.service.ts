@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../schemas/user.schema';
@@ -8,6 +8,8 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { FriendsService } from 'src/friends/friends.service';
 import * as crypto from 'crypto';
+import { Connection } from 'cypher-query-builder';
+import { NEO4J_CONNECTION } from 'src/neo4j/neo4j.constants';
 
 @Injectable()
 export class UserService {
@@ -15,6 +17,8 @@ export class UserService {
         @InjectModel(User.name) private userModel: Model<UserDocument>,
         private jwtService: JwtService,
         private readonly friendsService: FriendsService,
+        @Inject(NEO4J_CONNECTION)
+        private readonly neo4j: Connection,
     ) { }
 
     async findByName(name: string): Promise<User | null> {
@@ -69,6 +73,16 @@ export class UserService {
         });
 
         const savedUser = await newUser.save();
+
+        const createPersonQuery = this.neo4j.query()
+            .raw(`
+          CREATE (p:Person {userId: $userId})
+          RETURN p
+        `, {
+                userId: savedUser.userId
+            });
+
+        await createPersonQuery.run();
 
         // Friend 문서 생성
         await this.friendsService.createFriendDocument(savedUser.userId, createUserDto.name);
@@ -155,6 +169,16 @@ export class UserService {
         if (!user) {
             throw new ConflictException('User not found');
         }
+
+        const deletePersonQuery = this.neo4j.query()
+            .raw(`
+          MATCH (p:Person {userId: $userId})
+          DETACH DELETE p
+        `, {
+                userId
+            });
+
+        await deletePersonQuery.run();
 
         return newName;
     }

@@ -1,18 +1,16 @@
-import { Resolver, Query, Mutation } from '@nestjs/graphql';
+import { Resolver, Query, Args, ID } from '@nestjs/graphql';
 import { QueryRepository } from './neo4j/noe4j.service';
+import { RecommendedUserType } from './neo4j/recommand.type';
+import { RecommendedUser } from './interfaces/recommand.interface';
 
-@Resolver()
+@Resolver(() => RecommendedUserType)
 export class AppResolver {
   constructor(private readonly queryRepository: QueryRepository) { }
 
-  @Query(() => String)
-  async helloWorld() {
-    return 'hello world';
-  }
-
-  @Mutation(() => String)
-  async createGreeting() {
-    const result = await this.queryRepository.createHelloWorldNode();
-    return `Created node with message: ${JSON.stringify(result)}`;
+  @Query(() => [RecommendedUserType])
+  async getFriendRecommendations(
+    @Args('userId', { type: () => ID }) userId: string
+  ): Promise<RecommendedUser[]> {
+    return await this.queryRepository.getFriendRecommendations(userId);
   }
 }

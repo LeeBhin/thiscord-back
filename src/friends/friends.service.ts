@@ -1,8 +1,11 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
+import { Connection } from 'cypher-query-builder';
 import { Model } from 'mongoose';
 import { Friend } from 'src/interfaces/friend.interface';
+import { NEO4J_CONNECTION } from 'src/neo4j/neo4j.constants';
+import { ChatRoom } from 'src/schemas/chatRoom.schema';
 import { User } from 'src/schemas/user.schema';
 
 @Injectable()
@@ -10,6 +13,9 @@ export class FriendsService {
     constructor(
         @InjectModel('Friend') private readonly friendModel: Model<Friend>,
         @InjectModel('User') private readonly userModel: Model<User>,
+        @InjectModel('ChatRoom') private readonly chatRoomModel: Model<ChatRoom>,
+        @Inject(NEO4J_CONNECTION)
+        private readonly neo4j: Connection,
         private readonly jwtService: JwtService,
     ) { }
 
@@ -67,6 +73,21 @@ export class FriendsService {
 
             await user.save();
             await friendDocument.save();
+
+            if (friendDocument.friends[friendUserIndex]?.status === 'accepted') {
+                const createRelationshipQuery = this.neo4j.query()
+                    .raw(`
+                    MATCH (p1:Person {userId: $userId})
+                    MATCH (p2:Person {userId: $friendId})
+                    MERGE (p1)-[:FRIEND]->(p2)
+                    MERGE (p2)-[:FRIEND]->(p1)
+                  `, {
+                        userId,
+                        friendId
+                    });
+
+                await createRelationshipQuery.run();
+            }
 
             return { message: '친구 요청 수락' };
         }
@@ -153,6 +174,19 @@ export class FriendsService {
         await userDocument.save();
         await friendDocument.save();
 
+        const createRelationshipQuery = this.neo4j.query()
+            .raw(`
+          MATCH (p1:Person {userId: $userId})
+          MATCH (p2:Person {userId: $friendId})
+          MERGE (p1)-[:FRIEND]->(p2)
+          MERGE (p2)-[:FRIEND]->(p1)
+        `, {
+                userId: userid,
+                friendId: friendId
+            });
+
+        await createRelationshipQuery.run();
+
         return { message: '수락 완료' };
     }
 
@@ -189,15 +223,32 @@ export class FriendsService {
             await userDocument.save();
             await friendDocument.save();
 
-            const success = true;
+            const deleteRelationshipQuery = this.neo4j.query()
+                .raw(`
+              MATCH (p1:Person {userId: $userId})-[r:FRIEND]-(p2:Person {userId: $friendId})
+              DELETE r
+            `, {
+                    userId: userid,
+                    friendId: friendId
+                });
 
-            return success;
+            await deleteRelationshipQuery.run();
+
+            // 채팅방 삭제
+            const chatRoom = await this.chatRoomModel.findOne({
+                participants: { $all: [userid, friendId] },
+            }).exec();
+
+            if (chatRoom) {
+                await this.chatRoomModel.deleteOne({ _id: chatRoom._id }).exec();
+            }
+
+            return true;
 
         } catch (err) {
             console.error(err);
             throw new ConflictException('delete_friend Error');
         }
-
     }
 
     async getFriends(userid: string): Promise<{ name: string, iconColor: string }[]> {
