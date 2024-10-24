@@ -6,13 +6,14 @@ import { NEO4J_CONFIG, NEO4J_CONNECTION } from './neo4j.constants';
 import { createDatabaseConfig, ConnectionError } from './neo4j.utils';
 import { QueryRepository } from './noe4j.service';
 import { UserModule } from 'src/user/user.module';
+import { FriendsModule } from 'src/friends/friends.module';
 
 @Module({})
 export class Neo4jModule {
     static forRootAsync(customConfig?: Neo4jConfig): DynamicModule {
         return {
             module: Neo4jModule,
-            imports: [ConfigModule, UserModule],
+            imports: [ConfigModule, UserModule, FriendsModule],
             global: true,
             providers: [
                 QueryRepository,

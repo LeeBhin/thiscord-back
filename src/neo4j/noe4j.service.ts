@@ -16,23 +16,34 @@ export class QueryRepository {
     try {
       const query = this.connection.query()
         .raw(`
-          MATCH (me:Person {userId: $userId})-[:FRIEND]-(friend)-[:FRIEND]-(potentialFriend:Person)
+          MATCH (me:Person {userId: $userId})-[:FRIEND]-(mutualFriend:Person)-[:FRIEND]-(potentialFriend:Person)
           WHERE NOT (me)-[:FRIEND]-(potentialFriend) 
           AND me <> potentialFriend
-          WITH DISTINCT potentialFriend, COUNT(friend) AS friendCount
+          WITH potentialFriend, 
+               COLLECT(DISTINCT mutualFriend.userId) AS mutualFriendIds,
+               COUNT(DISTINCT mutualFriend) AS friendCount
           WHERE friendCount >= 2
-          RETURN potentialFriend.userId as recommendedUserId
+          RETURN potentialFriend.userId as recommendedUserId,
+                 mutualFriendIds
         `, { userId });
 
       const results = await query.run();
-      const recommendedUserIds = results.map(result => result.recommendedUserId);
 
       const recommendedUsers = await Promise.all(
-        recommendedUserIds.map(async (recommendedId) => {
-          const user = await this.userService.findById(recommendedId);
+        results.map(async (result) => {
+          const user = await this.userService.findById(result.recommendedUserId);
+
+          const mutualFriends = await Promise.all(
+            result.mutualFriendIds.map(async (friendId: string) => {
+              const friend = await this.userService.findById(friendId);
+              return friend.name;
+            })
+          );
+
           return {
-            userId: recommendedId,
-            name: user.name
+            name: user.name,
+            iconColor: user.iconColor,
+            mutualFriends: mutualFriends
           };
         })
       );
@@ -43,7 +54,6 @@ export class QueryRepository {
       throw new Error('Failed to fetch friend recommendations.');
     }
   }
-
 
   onApplicationShutdown() {
     this.connection.close();

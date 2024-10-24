@@ -1,4 +1,5 @@
 export interface RecommendedUser {
-    userId: string;
     name: string;
+    iconColor: string;
+    mutualFriends: string[];
 }
