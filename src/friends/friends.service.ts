@@ -2,7 +2,9 @@ import { Injectable, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { ChatService } from 'src/chat/chat.service';
 import { Friend } from 'src/interfaces/friend.interface';
+import { ChatRoom } from 'src/schemas/chatRoom.schema';
 import { User } from 'src/schemas/user.schema';
 
 @Injectable()
@@ -10,6 +12,8 @@ export class FriendsService {
     constructor(
         @InjectModel('Friend') private readonly friendModel: Model<Friend>,
         @InjectModel('User') private readonly userModel: Model<User>,
+        @InjectModel('ChatRoom') private readonly chatRoomModel: Model<ChatRoom>,
+
         private readonly jwtService: JwtService,
     ) { }
 
@@ -189,15 +193,21 @@ export class FriendsService {
             await userDocument.save();
             await friendDocument.save();
 
-            const success = true;
+            // 채팅방 삭제
+            const chatRoom = await this.chatRoomModel.findOne({
+                participants: { $all: [userid, friendId] },
+            }).exec();
 
-            return success;
+            if (chatRoom) {
+                await this.chatRoomModel.deleteOne({ _id: chatRoom._id }).exec();
+            }
+
+            return true;
 
         } catch (err) {
             console.error(err);
             throw new ConflictException('delete_friend Error');
         }
-
     }
 
     async getFriends(userid: string): Promise<{ name: string, iconColor: string }[]> {
