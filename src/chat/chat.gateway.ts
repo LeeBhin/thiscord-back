@@ -26,6 +26,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     server: Server;
 
     private clients: { [userId: string]: string } = {};
+    private clientsCurrnet: { [userid: string]: string } = {};
 
     constructor(
         private readonly chatService: ChatService,
@@ -98,6 +99,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
             _id: messageId
         });
 
+        if (this.clientsCurrnet[receiverId] === (await this.userService.findById(senderId)).name) return;
+
         try {
             const notificationSettings = await this.notificationService.getNotificationSettings(receiverId);
 
@@ -117,6 +120,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         } catch (error) {
             console.error('Push notification failed:', error);
         }
+    }
+
+    @SubscribeMessage('current')
+    async handleCurrent(
+        @MessageBody() data: { userId: string; current: string; },
+    ): Promise<void> {
+        this.clientsCurrnet[data.userId] = data.current;
     }
 
     @SubscribeMessage('delete')
