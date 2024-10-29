@@ -12,6 +12,7 @@ import { ChatService } from './chat.service';
 import { UserService } from 'src/user/user.service';
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
 import mongoose from 'mongoose';
+import { NotificationService } from 'src/notification/notofication.service';
 
 @WebSocketGateway({
     cors: {
@@ -29,6 +30,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     constructor(
         private readonly chatService: ChatService,
         private readonly userService: UserService,
+        private readonly notificationService: NotificationService,
     ) { }
 
     private getCookieValue(cookie: string, key: string): string | null {
@@ -95,6 +97,26 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
             },
             _id: messageId
         });
+
+        try {
+            const notificationSettings = await this.notificationService.getNotificationSettings(receiverId);
+
+            if (notificationSettings) {
+                const sender = await this.userService.findById(senderId);
+                const senderName = sender.name || '알 수 없는 사용자';
+
+                await this.notificationService.sendNotification(receiverId, {
+                    title: senderName,
+                    body: `${data.message.length > 50 ? data.message.substring(0, 47) + '...' : data.message}`,
+                    badge: `images/colorIcon.png`,
+                    icon: (await this.userService.findById(senderId)).iconColor,
+                    url: `/channels/me/@${(await this.userService.findById(senderId)).name}`,
+                });
+
+            }
+        } catch (error) {
+            console.error('Push notification failed:', error);
+        }
     }
 
     @SubscribeMessage('delete')
