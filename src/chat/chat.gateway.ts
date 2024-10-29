@@ -96,7 +96,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 [senderId]: true,
                 [receiverId]: false
             },
-            _id: messageId
+            _id: messageId,
+            senderName: (await this.userService.findById(senderId)).name,
+            receiverName: (await this.userService.findById(receiverId)).name,
         });
 
         if (this.clientsCurrnet[receiverId] === (await this.userService.findById(senderId)).name) return;
