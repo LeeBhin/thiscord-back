@@ -25,10 +25,10 @@ export class NotificationHistory {
 
 @Schema({ timestamps: true })
 export class Notification {
-    @Prop({ type: Types.ObjectId, ref: 'User', required: true, unique: true })
+    @Prop({ type: Types.ObjectId, ref: 'User', required: true })
     userId: Types.ObjectId;
 
-    @Prop({ type: Object, required: true })
+    @Prop({ type: Object, required: true, unique: true })
     subscription: SubscriptionDto;
 
     @Prop({ type: [NotificationHistory] })

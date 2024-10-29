@@ -21,9 +21,10 @@ export class NotificationService {
     }
 
     async saveSubscription(userId: string, subscription: SubscriptionDto) {
+        console.log(subscription)
         try {
             await this.notificationModel.findOneAndUpdate(
-                { userId },
+                { userId, 'subscription.endpoint': subscription.endpoint },
                 {
                     userId,
                     subscription,
@@ -32,13 +33,13 @@ export class NotificationService {
                 { upsert: true }
             );
         } catch (error) {
-            throw new HttpException('구독 정보 저장 실패' + error, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new HttpException('구독 정보 저장 실패: ' + error, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     async removeSubscription(userId: string) {
         try {
-            await this.notificationModel.findOneAndDelete({
+            await this.notificationModel.deleteMany({
                 userId
             });
         } catch (error) {
@@ -48,11 +49,11 @@ export class NotificationService {
 
     async sendNotification(userId: string, notification: NotificationDto) {
         try {
-            const subscriptionDoc = await this.notificationModel.findOne({
+            const subscriptionDocs = await this.notificationModel.find({
                 userId
             });
 
-            if (!subscriptionDoc) {
+            if (!subscriptionDocs.length) {
                 throw new NotFoundException('구독 정보를 찾을 수 없습니다.');
             }
 
@@ -66,20 +67,29 @@ export class NotificationService {
                 timestamp: new Date().getTime()
             };
 
-            const result = await webpush.sendNotification(
-                subscriptionDoc.subscription,
-                JSON.stringify(payload)
+            const results = await Promise.all(
+                subscriptionDocs.map(async (doc) => {
+                    try {
+                        return await webpush.sendNotification(
+                            doc.subscription,
+                            JSON.stringify(payload)
+                        );
+                    } catch (error) {
+                        if (error.statusCode === 410) {
+                            await this.removeSubscription(userId);
+                            console.log('구독이 만료되었습니다.', HttpStatus.GONE);
+                        }
+                        throw error;
+                    }
+                })
             );
 
-            await this.saveNotificationHistory(userId, notification);
+            // await this.saveNotificationHistory(userId, notification);
 
-            return result;
+            return results;
         } catch (error) {
-            if (error.statusCode === 410) {
-                await this.removeSubscription(userId);
-                console.log('구독이 만료되었습니다.', HttpStatus.GONE);
-            }
             console.log('알림 전송 실패' + error, HttpStatus.INTERNAL_SERVER_ERROR);
+            throw error;
         }
     }
 
@@ -112,19 +122,22 @@ export class NotificationService {
         }
     }
 
-    async getNotificationSettings(userId: string) {
+    async getNotificationSettings(userId: string, endpoint?: string) {
         try {
-            const settings = await this.notificationModel.findOne({
+            if (endpoint && endpoint !== 'undefined') {
+                const settings = await this.notificationModel.findOne({
+                    userId,
+                    'subscription.endpoint': endpoint
+                });
+                return settings;
+            }
+
+            const settings = await this.notificationModel.find({
                 userId
             });
 
-            if (!settings) {
-                // const defaultSettings = await this.notificationModel.create({
-                //     userId, subscription
-                // });
-                // console.log(defaultSettings)
-                // return defaultSettings;
-                return { message: '!settings' }
+            if (!settings || settings.length === 0) {
+                return { message: '!settings' };
             }
 
             return settings;

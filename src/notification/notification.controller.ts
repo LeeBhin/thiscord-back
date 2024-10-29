@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Get, Put, UseGuards, Request, UnauthorizedException, Req } from '@nestjs/common';
+import { Controller, Post, Body, Param, Get, Put, UseGuards, Request, UnauthorizedException, Req, Query } from '@nestjs/common';
 import { NotificationService } from './notofication.service';
 import { SubscriptionDto } from '../dto/notification.dto';
 import { UserService } from 'src/user/user.service';
@@ -45,7 +45,7 @@ export class NotificationController {
     }
 
     @Get('settings')
-    async getSettings(@Request() req) {
+    async getSettings(@Request() req, @Query('endpoint') endpoint?: string) {
         const token = req.cookies['jwtToken'];
         if (!token) {
             throw new UnauthorizedException('No token provided');
@@ -54,11 +54,20 @@ export class NotificationController {
         const decoded = this.userService.verifyToken(token);
         const userId = decoded.userId;
 
+
+        if (endpoint && endpoint !== 'unedfined') {
+            const settings = await this.notificationService.getNotificationSettings(
+                userId,
+                endpoint
+            );
+
+            return { settings };
+        }
+
         const settings = await this.notificationService.getNotificationSettings(
-            userId
+            userId,
         );
-        if (settings)
-            return { settings }
+        return { settings };
     }
 
 }

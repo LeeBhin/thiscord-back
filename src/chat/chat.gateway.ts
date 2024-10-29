@@ -102,7 +102,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         });
 
         if (this.clientsCurrnet[receiverId] === (await this.userService.findById(senderId)).name) return;
-
         try {
             const notificationSettings = await this.notificationService.getNotificationSettings(receiverId);
 
