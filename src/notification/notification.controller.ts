@@ -45,7 +45,7 @@ export class NotificationController {
     }
 
     @Get('settings')
-    async getSettings(@Request() req, @Query('endpoint') endpoint?: string) {
+    async getSettings(@Request() req, @Query('endpoint') endpoint?: any) {
         const token = req.cookies['jwtToken'];
         if (!token) {
             throw new UnauthorizedException('No token provided');
@@ -54,19 +54,11 @@ export class NotificationController {
         const decoded = this.userService.verifyToken(token);
         const userId = decoded.userId;
 
-
-        if (endpoint && endpoint !== 'unedfined') {
-            const settings = await this.notificationService.getNotificationSettings(
-                userId,
-                endpoint
-            );
-
-            return { settings };
-        }
-
         const settings = await this.notificationService.getNotificationSettings(
             userId,
+            endpoint
         );
+
         return { settings };
     }
 

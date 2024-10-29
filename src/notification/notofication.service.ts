@@ -21,7 +21,6 @@ export class NotificationService {
     }
 
     async saveSubscription(userId: string, subscription: SubscriptionDto) {
-        console.log(subscription)
         try {
             await this.notificationModel.findOneAndUpdate(
                 { userId, 'subscription.endpoint': subscription.endpoint },
@@ -104,43 +103,18 @@ export class NotificationService {
         await Promise.all(promises);
     }
 
-    private async saveNotificationHistory(userId: string, notification: NotificationDto) {
+    async getNotificationSettings(userId: string, endpoint?: any) {
         try {
-            await this.notificationModel.findOneAndUpdate(
-                { userId },
-                {
-                    $push: {
-                        history: {
-                            ...notification,
-                            sentAt: new Date()
-                        }
-                    }
-                }
-            );
-        } catch (error) {
-            console.error('알림 기록 저장 실패:', error);
-        }
-    }
-
-    async getNotificationSettings(userId: string, endpoint?: string) {
-        try {
-            if (endpoint && endpoint !== 'undefined') {
-                const settings = await this.notificationModel.findOne({
-                    userId,
-                    'subscription.endpoint': endpoint
-                });
-                return settings;
-            }
-
-            const settings = await this.notificationModel.find({
-                userId
+            const settings = await this.notificationModel.findOne({
+                userId,
+                'subscription.endpoint': endpoint
             });
 
-            if (!settings || settings.length === 0) {
+            if (!settings) {
                 return { message: '!settings' };
             }
 
-            return settings;
+            return { success: true }
         } catch (error) {
             throw new HttpException(
                 '알림 설정 조회 실패: ' + error,
