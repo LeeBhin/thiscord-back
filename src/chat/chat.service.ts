@@ -309,6 +309,10 @@ export class ChatService {
         const receiverUser = await this.userService.findByName(receiverName);
         const receiverUserId = receiverUser.userId;
 
+        if (!receiverUserId) {
+            return;
+        }
+
         const chatRoom = await this.chatRoomModel.findOne({
             participants: { $all: [userId, receiverUserId] },
         });

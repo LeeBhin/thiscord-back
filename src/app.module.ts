@@ -12,6 +12,7 @@ import { AppResolver } from './app.resolver';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { QueryRepository } from './neo4j/noe4j.service';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { QueryRepository } from './neo4j/noe4j.service';
       driver: ApolloDriver,
       autoSchemaFile: true,
     }),
+    NotificationModule
   ],
   controllers: [AppController],
   providers: [AppService, AppResolver, QueryRepository],
