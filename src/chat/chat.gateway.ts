@@ -80,14 +80,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: Socket,
     ): Promise<void> {
         const { senderId, receiverId } = await this.getUserIds(client, data.receivedUser);
-
-        let chatRoom = await this.chatService.findChatRoomByParticipants(senderId, receiverId);
-
         const messageId = new mongoose.Types.ObjectId();
 
-        await this.chatService.saveMessage(chatRoom._id.toString(), senderId, receiverId, data.message, messageId);
-
-        this.emitToParticipants(chatRoom.participants, 'message', {
+        const messageData = {
             receiverId,
             message: data.message,
             senderId,
@@ -97,30 +92,51 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 [receiverId]: false
             },
             _id: messageId,
-            senderName: (await this.userService.findById(senderId)).name,
-            receiverName: (await this.userService.findById(receiverId)).name,
+        };
+
+        const [sender, receiver] = await Promise.all([
+            this.userService.findById(senderId),
+            this.userService.findById(receiverId)
+        ]);
+
+        messageData['senderName'] = sender.name;
+        messageData['receiverName'] = receiver.name;
+
+        this.emitToParticipants([senderId, receiverId], 'message', messageData);
+
+        Promise.all([
+            (async () => {
+                const chatRoom = await this.chatService.findChatRoomByParticipants(senderId, receiverId);
+                await this.chatService.saveMessage(
+                    chatRoom._id.toString(),
+                    senderId,
+                    receiverId,
+                    data.message,
+                    messageId
+                );
+            })(),
+
+            (async () => {
+                if (this.clientsCurrnet[receiverId] === sender.name) return;
+
+                try {
+                    const notificationSettings = await this.notificationService.getNotificationSettings(receiverId);
+                    if (notificationSettings) {
+                        await this.notificationService.sendNotification(receiverId, {
+                            title: sender.name || '알 수 없는 사용자',
+                            body: `${data.message.length > 50 ? data.message.substring(0, 47) + '...' : data.message}`,
+                            badge: `images/colorIcon.png`,
+                            icon: sender.iconColor,
+                            url: `/channels/me/@${sender.name}`,
+                        });
+                    }
+                } catch (error) {
+                    console.error('Push notification failed:', error);
+                }
+            })()
+        ]).catch(error => {
+            console.error('Error in background operations:', error);
         });
-
-        if (this.clientsCurrnet[receiverId] === (await this.userService.findById(senderId)).name) return;
-        try {
-            const notificationSettings = await this.notificationService.getNotificationSettings(receiverId);
-
-            if (notificationSettings) {
-                const sender = await this.userService.findById(senderId);
-                const senderName = sender.name || '알 수 없는 사용자';
-
-                await this.notificationService.sendNotification(receiverId, {
-                    title: senderName,
-                    body: `${data.message.length > 50 ? data.message.substring(0, 47) + '...' : data.message}`,
-                    badge: `images/colorIcon.png`,
-                    icon: (await this.userService.findById(senderId)).iconColor,
-                    url: `/channels/me/@${(await this.userService.findById(senderId)).name}`,
-                });
-
-            }
-        } catch (error) {
-            console.error('Push notification failed:', error);
-        }
     }
 
     @SubscribeMessage('current')
