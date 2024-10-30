@@ -53,7 +53,7 @@ export class NotificationService {
             });
 
             if (!subscriptionDocs.length) {
-                throw new NotFoundException('구독 정보를 찾을 수 없습니다.');
+                return;
             }
 
             const payload = {

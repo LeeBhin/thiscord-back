@@ -19,7 +19,7 @@ import { NotificationService } from 'src/notification/notofication.service';
         origin: ['http://localhost:3000', 'https://smcthiscord.netlify.app'],
         credentials: true,
     },
-    transport: ['websocket', 'polling'],
+    transport: ['websocket'],
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
