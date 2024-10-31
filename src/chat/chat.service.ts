@@ -214,13 +214,17 @@ export class ChatService {
 
         const otherParticipants = await Promise.all(chatRooms.map(async (room) => {
             const otherParticipantId = room.participants.find((participantId) => participantId !== senderId);
-
             const otherParticipant = await this.userService.findById(otherParticipantId);
+
+            const unreadCount = room.messages.filter(message => {
+                return !message.isRead[senderId];
+            }).length;
 
             return {
                 participantName: otherParticipant?.name || 'Unknown',
                 iconColor: otherParticipant?.iconColor || '#000000',
-                lastMessageAt: room.lastMessageAt
+                lastMessageAt: room.lastMessageAt,
+                unreadCount: unreadCount
             };
         }));
 
