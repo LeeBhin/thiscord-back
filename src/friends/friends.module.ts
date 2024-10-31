@@ -6,6 +6,7 @@ import { FriendsController } from './friends.controller';
 import { FriendSchema } from 'src/schemas/friend.schema';
 import { UserModule } from 'src/user/user.module';
 import { ChatRoom, ChatRoomSchema } from 'src/schemas/chatRoom.schema';
+import { NotificationModule } from 'src/notification/notification.module';
 
 @Module({
     imports: [
@@ -16,6 +17,7 @@ import { ChatRoom, ChatRoomSchema } from 'src/schemas/chatRoom.schema';
             signOptions: { expiresIn: '7d' },
         }),
         forwardRef(() => UserModule),
+        NotificationModule,
     ],
     providers: [FriendsService],
     controllers: [FriendsController],

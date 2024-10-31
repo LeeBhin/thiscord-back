@@ -2,18 +2,19 @@ import { HttpStatus, Controller, Delete, Get, Param, Post, Put, Req, Unauthorize
 import { Request } from 'supertest';
 import { FriendsService } from './friends.service';
 import { UserService } from 'src/user/user.service';
+import { NotificationService } from 'src/notification/notofication.service';
 
 @Controller('friends')
 export class FriendsController {
     constructor(
         private readonly friendsService: FriendsService,
         private readonly userService: UserService,
+        private readonly notificationService: NotificationService
     ) { }
 
     // 친구 요청
     @Post('request/:friend')
     async sendRequest(@Param('friend') friendName: string, @Req() req: Request) {
-
         const token = req.cookies['jwtToken'];
         if (!token) {
             throw new UnauthorizedException('No token provided');
@@ -22,7 +23,28 @@ export class FriendsController {
         const decoded = this.userService.verifyToken(token);
         const userId = decoded.userId;
 
-        return this.friendsService.sendRequest(userId, friendName);
+        const result = await this.friendsService.sendRequest(userId, friendName);
+
+        try {
+            const sender = await this.userService.findById(userId);
+
+            const receiver = await this.userService.findByName(friendName);
+
+            const notificationSettings = await this.notificationService.getNotificationSettings(receiver.userId);
+
+            if (notificationSettings) {
+                await this.notificationService.sendNotification(receiver.userId, {
+                    title: sender.name || '알 수 없는 사용자',
+                    body: '친구 요청 보냄.',
+                    badge: 'images/colorIcon.png',
+                    icon: sender.iconColor,
+                    url: '/channels/@me/request',
+                });
+            }
+        } catch (error) {
+            console.error('Push notification failed:', error);
+        }
+        return result;
     }
 
     // 요청 수락
