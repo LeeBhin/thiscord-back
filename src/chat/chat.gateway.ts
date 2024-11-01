@@ -76,7 +76,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     @SubscribeMessage('message')
     async handleMessage(
-        @MessageBody() data: { receivedUser: string; message: string; timestamp: string },
+        @MessageBody() data: { receivedUser: string; message: string; timestamp: string; iconColor: string },
         @ConnectedSocket() client: Socket,
     ): Promise<void> {
         const { senderId, receiverId } = await this.getUserIds(client, data.receivedUser);
@@ -92,6 +92,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 [receiverId]: false
             },
             _id: messageId,
+            iconColor: data.iconColor
         };
 
         const [sender, receiver] = await Promise.all([
