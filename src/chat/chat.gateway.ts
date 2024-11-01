@@ -127,7 +127,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
                             title: sender.name || '알 수 없는 사용자',
                             body: `${data.message.length > 50 ? data.message.substring(0, 47) + '...' : data.message}`,
                             badge: `images/colorIcon.png`,
-                            icon: sender.iconColor,
+                            icon: sender.iconColor.slice(1),
                             url: `/channels/me/@${sender.name}`,
                         });
                     }
