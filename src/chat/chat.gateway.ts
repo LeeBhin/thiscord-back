@@ -147,7 +147,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     ): Promise<void> {
         const { senderId, receiverId } = await this.getUserIds(client, data.receivedUser);
 
-        this.emitToParticipants([senderId, receiverId], 'writing', data.senderUser);
+        this.emitToParticipants([senderId, receiverId], 'writing', { senderUser: data.senderUser, receivedUser: data.receivedUser });
     }
 
     @SubscribeMessage('current')
