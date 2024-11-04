@@ -140,6 +140,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         });
     }
 
+    @SubscribeMessage('writing')
+    async handleWriting(
+        @MessageBody() data: { receivedUser: string; senderUser: string },
+        @ConnectedSocket() client: Socket,
+    ): Promise<void> {
+        const { senderId, receiverId } = await this.getUserIds(client, data.receivedUser);
+
+        this.emitToParticipants([senderId, receiverId], 'writing', data.senderUser);
+    }
+
     @SubscribeMessage('current')
     async handleCurrent(
         @MessageBody() data: { userId: string; current: string; },
