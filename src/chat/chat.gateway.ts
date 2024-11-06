@@ -145,9 +145,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() data: { receivedUser: string; senderUser: string },
         @ConnectedSocket() client: Socket,
     ): Promise<void> {
-        const { senderId, receiverId } = await this.getUserIds(client, data.receivedUser);
-
-        this.emitToParticipants([senderId, receiverId], 'writing', { senderUser: data.senderUser, receivedUser: data.receivedUser });
+        const receiverId = (await this.userService.findByName(data.receivedUser)).userId
+        this.emitToOne(receiverId, 'writing', { senderUser: data.senderUser, receivedUser: data.receivedUser });
     }
 
     @SubscribeMessage('current')
@@ -212,6 +211,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
                 this.server.to(receiverSocketId).emit(event, data);
             }
         });
+    }
+
+    private emitToOne(target: string, event: string, data: any) {
+        const receiverSocketId = this.getReceiverSocketId(target);
+        if (receiverSocketId) {
+            this.server.to(receiverSocketId).emit(event, data);
+        }
     }
 
     @SubscribeMessage('friendReq')
