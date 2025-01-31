@@ -4,12 +4,15 @@ import * as cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
   app.use(cookieParser());
+
   app.enableCors({
-    origin: "*",
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    credentials: false
+    origin: ['http://localhost:3000', 'https://smcthiscord.netlify.app'],
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
   });
+
   await app.listen(3002);
 }
 bootstrap();
