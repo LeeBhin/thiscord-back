@@ -1,6 +1,6 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model } from 'mongoose';
 import { User, UserDocument } from '../schemas/user.schema';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { v4 as uuidv4 } from 'uuid';
@@ -8,8 +8,6 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { FriendsService } from 'src/friends/friends.service';
 import * as crypto from 'crypto';
-import { Connection } from 'cypher-query-builder';
-import { NEO4J_CONNECTION } from 'src/neo4j/neo4j.constants';
 
 @Injectable()
 export class UserService {
@@ -17,36 +15,41 @@ export class UserService {
         @InjectModel(User.name) private userModel: Model<UserDocument>,
         private jwtService: JwtService,
         private readonly friendsService: FriendsService,
-        @Inject(NEO4J_CONNECTION)
-        private readonly neo4j: Connection,
     ) { }
 
     async findByName(name: string): Promise<User | null> {
-        return this.userModel.findOne({ name }).exec();
+        return this.userModel.findOne({ name }).select('userId name iconColor').lean().exec();
     }
 
     async findById(userId: string): Promise<User | null> {
-        const user = await this.userModel.findOne({ userId: userId }).exec();
+        const user = await this.userModel.findOne({ userId: userId }).select('userId name iconColor').lean().exec();
         if (!user) {
             throw new NotFoundException(`User not found`);
         }
         return user;
     }
 
+    // 배치로 사용자 조회 (성능 최적화)
+    async findUsersByIds(userIds: string[]): Promise<User[]> {
+        return this.userModel
+            .find({ userId: { $in: userIds } })
+            .select('userId name iconColor')
+            .lean()
+            .exec();
+    }
+
     // 모든 user 조회
     async findAll(): Promise<User[]> {
-        return this.userModel.find().exec();
+        return this.userModel.find().select('userId name iconColor').lean().exec();
     }
 
     // 특정 user 조회
     async findOne(id: string): Promise<User | null> {
-        return this.userModel.findOne({ userId: id }).exec();
+        return this.userModel.findOne({ userId: id }).select('userId name iconColor').lean().exec();
     }
-
 
     // 새로운 user 생성
     async create(createUserDto: CreateUserDto): Promise<User> {
-
         const colors = [
             '#B9BBBE',
             '#5865F2',
@@ -57,19 +60,19 @@ export class UserService {
             '#9B59B6'
         ];
 
-        const existingMail = await this.userModel.findOne({ phoneOrEmail: createUserDto.phoneOrEmail }).exec();
+        const existingMail = await this.userModel.findOne({ phoneOrEmail: createUserDto.phoneOrEmail }).lean().exec();
         if (existingMail) {
             throw new ConflictException('이미 가입된 휴대폰 번호 또는 이메일입니다.');
         }
 
-        const existingName = await this.userModel.findOne({ name: new RegExp(`^${createUserDto.name}$`, 'i') }).exec();
+        const existingName = await this.userModel.findOne({ name: new RegExp(`^${createUserDto.name}$`, 'i') }).lean().exec();
         if (existingName) {
             throw new ConflictException('이미 가입된 이름입니다.');
         }
 
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
         const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+        
         const newUser = new this.userModel({
             ...createUserDto,
             userId: uuidv4(),
@@ -78,16 +81,6 @@ export class UserService {
         });
 
         const savedUser = await newUser.save();
-
-        const createPersonQuery = this.neo4j.query()
-            .raw(`
-          CREATE (p:Person {userId: $userId})
-          RETURN p
-        `, {
-                userId: savedUser.userId
-            });
-
-        await createPersonQuery.run();
 
         // Friend 문서 생성
         await this.friendsService.createFriendDocument(savedUser.userId, createUserDto.name);
@@ -131,7 +124,7 @@ export class UserService {
     }
 
     async updateUserName(userId: string, newName: string): Promise<any> {
-        const existingName = await this.userModel.findOne({ name: new RegExp(`^${newName}$`, 'i') }).exec();
+        const existingName = await this.userModel.findOne({ name: new RegExp(`^${newName}$`, 'i') }).lean().exec();
         if (existingName) {
             return '이미 사용중인 이름입니다.'
         }
@@ -146,13 +139,11 @@ export class UserService {
             console.log('사용자를 찾을 수 없습니다.');
         }
 
-        const result = updatedUser.name
-
-        return result;
+        return updatedUser.name;
     }
 
     async myInfo(userId: string): Promise<{ name: string, iconColor: string } | null> {
-        const user = await this.userModel.findOne({ userId }).exec();
+        const user = await this.userModel.findOne({ userId }).select('name iconColor').lean().exec();
 
         if (!user) {
             console.log('user not found')
@@ -167,7 +158,12 @@ export class UserService {
 
         const user = await this.userModel.findOneAndUpdate(
             { userId },
-            { name: newName, fcmToken: 'deletedUser', phoneOrEmail: `deleted_${userId}_${randomSuffix}_${timestamp}_${newName}`, password: '' },
+            { 
+                name: newName, 
+                fcmToken: 'deletedUser', 
+                phoneOrEmail: `deleted_${userId}_${randomSuffix}_${timestamp}_${newName}`, 
+                password: '' 
+            },
             { new: true }
         );
 
@@ -175,21 +171,11 @@ export class UserService {
             throw new ConflictException('User not found');
         }
 
-        const deletePersonQuery = this.neo4j.query()
-            .raw(`
-          MATCH (p:Person {userId: $userId})
-          DETACH DELETE p
-        `, {
-                userId
-            });
-
-        await deletePersonQuery.run();
-
         return newName;
     }
 
     async validatePassword(userId: string, password: string): Promise<boolean> {
-        const user = await this.userModel.findOne({ userId });
+        const user = await this.userModel.findOne({ userId }).select('password').exec();
         if (!user) {
             throw new ConflictException('User not found');
         }

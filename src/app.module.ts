@@ -7,12 +7,11 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { FriendsModule } from './friends/friends.module';
 import { ChatModule } from './chat/chat.module';
-import { Neo4jModule } from './neo4j/neo4j.module';
 import { AppResolver } from './app.resolver';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
-import { QueryRepository } from './neo4j/noe4j.service';
 import { NotificationModule } from './notification/notification.module';
+import { RecommendationService } from './recommendation/recommendation.service';
 
 @Module({
   imports: [
@@ -25,7 +24,6 @@ import { NotificationModule } from './notification/notification.module';
     UserModule,
     FriendsModule,
     ChatModule,
-    Neo4jModule.forRootAsync(),
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
       autoSchemaFile: true,
@@ -33,6 +31,6 @@ import { NotificationModule } from './notification/notification.module';
     NotificationModule
   ],
   controllers: [AppController],
-  providers: [AppService, AppResolver, QueryRepository],
+  providers: [AppService, AppResolver, RecommendationService],
 })
 export class AppModule { }

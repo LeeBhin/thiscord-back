@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import mongoose, { Model, mongo, ObjectId } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import { ChatRoom, ChatRoomDocument } from '../schemas/chatRoom.schema';
 import { User } from 'src/schemas/user.schema';
 import { UserService } from 'src/user/user.service';
@@ -22,7 +22,7 @@ export class ChatService {
     }
 
     async saveMessage(_id: string, senderId: string, receiverId: string, message: string, messageId: mongoose.Types.ObjectId): Promise<ChatRoom> {
-        const chatRoom = await this.chatRoomModel.findById(_id);
+        const chatRoom = await this.chatRoomModel.findById(_id).exec();
         if (!chatRoom) {
             throw new Error('Chat room not found');
         }
@@ -46,30 +46,38 @@ export class ChatService {
     }
 
     async createChatRoom(userId: string, participants: string[]): Promise<ChatRoom> {
-
-        const existingChatRoom = await this.chatRoomModel.findOne({
-            participants: { $all: participants }
-        }).exec();
+        const existingChatRoom = await this.chatRoomModel
+            .findOne({ participants: { $all: participants } })
+            .lean()
+            .exec();
 
         if (existingChatRoom) {
             console.log('Chat room already exists');
             return null;
         }
 
-        const userFriendDocument = await this.friendModel.findOne({ userid: userId }).exec();
+        const userFriendDocument = await this.friendModel
+            .findOne({ userid: userId })
+            .select('friends')
+            .lean()
+            .exec();
+            
         if (!userFriendDocument) {
             console.log('User not found');
+            return null;
         }
 
         const acceptedFriends = userFriendDocument.friends
             .filter(friend => friend.status === 'accepted')
             .map(friend => friend.friendid);
 
-        const invalidParticipants = participants.filter(participant => participant !== userId && !acceptedFriends.includes(participant));
+        const invalidParticipants = participants.filter(participant => 
+            participant !== userId && !acceptedFriends.includes(participant)
+        );
 
         if (invalidParticipants.length > 0) {
-            console.log('not your friend')
-            return;
+            console.log('not your friend');
+            return null;
         }
 
         const newChatRoom = new this.chatRoomModel({
@@ -122,18 +130,20 @@ export class ChatService {
             };
         }
 
+        const totalCount = chatRoom.messages.length;
+
         if (lastReadMsgId === chatRoom.messages.at(-1)?._id.toString()) {
             return {
                 message: 'last message',
                 messages: [],
-                totalCount: chatRoom.messages.length
+                totalCount
             };
         }
         if (lastReadMsgId === chatRoom.messages.at(0)?._id.toString()) {
             return {
                 message: 'first message',
                 messages: [],
-                totalCount: chatRoom.messages.length
+                totalCount
             };
         }
 
@@ -155,7 +165,7 @@ export class ChatService {
                 endIndex = lastReadIndex;
             } else if (direction === 'down') {
                 startIndex = lastReadIndex + 1;
-                endIndex = Math.min(chatRoom.messages.length, startIndex + PAGE_SIZE);
+                endIndex = Math.min(totalCount, startIndex + PAGE_SIZE);
             } else {
                 throw new BadRequestException('Invalid direction specified');
             }
@@ -165,7 +175,7 @@ export class ChatService {
             return {
                 messages,
                 senderId,
-                totalCount: chatRoom.messages.length
+                totalCount
             };
 
         } else {
@@ -181,8 +191,8 @@ export class ChatService {
                 );
 
                 const startIndex = Math.max(0, lastReadIndex - 70);
-
-                const endIndex = chatRoom.messages.length;
+                const endIndex = totalCount;
+                
                 messages = [
                     ...chatRoom.messages.slice(startIndex, lastReadIndex + 1),
                     ...chatRoom.messages.slice(lastReadIndex + 1, endIndex)
@@ -194,7 +204,7 @@ export class ChatService {
             return {
                 messages,
                 senderId,
-                totalCount: chatRoom.messages.length
+                totalCount
             };
         }
     }
@@ -208,13 +218,25 @@ export class ChatService {
         const decoded = this.userService.verifyToken(token);
         const senderId = decoded.userId;
 
-        const chatRooms = await this.chatRoomModel.find({
-            participants: senderId,
-        });
+        const chatRooms = await this.chatRoomModel
+            .find({ participants: senderId })
+            .select('participants lastMessageAt messages')
+            .lean()
+            .exec();
 
-        const otherParticipants = await Promise.all(chatRooms.map(async (room) => {
-            const otherParticipantId = room.participants.find((participantId) => participantId !== senderId);
-            const otherParticipant = await this.userService.findById(otherParticipantId);
+        const otherParticipantIds = chatRooms.map(room => 
+            room.participants.find(participantId => participantId !== senderId)
+        );
+
+        // 배치로 사용자 정보 조회
+        const otherParticipants = await this.userService.findUsersByIds(otherParticipantIds);
+        const participantMap = new Map(
+            otherParticipants.map(user => [user.userId, user])
+        );
+
+        const result = chatRooms.map(room => {
+            const otherParticipantId = room.participants.find(participantId => participantId !== senderId);
+            const otherParticipant = participantMap.get(otherParticipantId);
 
             const unreadCount = room.messages.filter(message => {
                 return !message.isRead[senderId];
@@ -226,9 +248,9 @@ export class ChatService {
                 lastMessageAt: room.lastMessageAt,
                 unreadCount: unreadCount
             };
-        }));
+        });
 
-        return otherParticipants;
+        return result;
     }
 
     async deleteMsg(req: Request, msgId: string, senderId: string, receiverName: string): Promise<any> {
@@ -243,8 +265,8 @@ export class ChatService {
         const receiverUser = await this.userService.findByName(receiverName);
         const receiverUserId = receiverUser.userId;
 
-        if (userId != userId) {
-            return new UnauthorizedException('no access');
+        if (userId !== senderId) {
+            throw new UnauthorizedException('no access');
         }
 
         const chatRoom = await this.chatRoomModel.findOne({
@@ -261,7 +283,6 @@ export class ChatService {
         }
 
         await chatRoom.save();
-
         return { success: true };
     }
 
@@ -339,5 +360,4 @@ export class ChatService {
 
         return { success: true };
     }
-
 }

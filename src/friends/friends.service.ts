@@ -1,10 +1,8 @@
-import { Injectable, ConflictException, Inject } from '@nestjs/common';
+import { Injectable, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
-import { Connection } from 'cypher-query-builder';
 import { Model } from 'mongoose';
 import { Friend } from 'src/interfaces/friend.interface';
-import { NEO4J_CONNECTION } from 'src/neo4j/neo4j.constants';
 import { ChatRoom } from 'src/schemas/chatRoom.schema';
 import { User } from 'src/schemas/user.schema';
 
@@ -14,26 +12,41 @@ export class FriendsService {
         @InjectModel('Friend') private readonly friendModel: Model<Friend>,
         @InjectModel('User') private readonly userModel: Model<User>,
         @InjectModel('ChatRoom') private readonly chatRoomModel: Model<ChatRoom>,
-        @Inject(NEO4J_CONNECTION)
-        private readonly neo4j: Connection,
         private readonly jwtService: JwtService,
     ) { }
 
     async sendRequest(userId: string, friendName: string): Promise<any> {
-        const user = await this.friendModel.findOne({ userid: userId }).exec();
-        const myName = (await this.userModel.findOne({ userId }).exec()).name;
+        // 먼저 사용자의 Friend 문서가 존재하는지 확인하고, 없으면 생성
+        let user = await this.friendModel.findOne({ userid: userId }).exec();
+        if (!user) {
+            const userData = await this.userModel.findOne({ userId }).select('name').lean().exec();
+            await this.createFriendDocument(userId, userData?.name || 'Unknown');
+            user = await this.friendModel.findOne({ userid: userId }).exec();
+        }
+
+        const [friend] = await Promise.all([
+            this.userModel.findOne({ name: friendName }).select('userId name').lean().exec()
+        ]);
+
+        const myName = (await this.userModel.findOne({ userId }).select('name').lean().exec()).name;
 
         if (!user) {
             throw new ConflictException('user not found');
         }
 
-        const friend = await this.userModel.findOne({ name: friendName }).exec();
         if (!friend) {
             throw new ConflictException('흠, 안 되는군요. 사용자명을 올바르게 입력했는지 확인하세요.');
         }
 
         const friendId = friend.userId;
-        const friendDocument = await this.friendModel.findOne({ userid: friendId }).exec();
+        
+        // 친구의 Friend 문서도 확인하고 없으면 생성
+        let friendDocument = await this.friendModel.findOne({ userid: friendId }).exec();
+        if (!friendDocument) {
+            await this.createFriendDocument(friendId, friend.name);
+            friendDocument = await this.friendModel.findOne({ userid: friendId }).exec();
+        }
+
         if (!friendDocument) {
             throw new ConflictException('Friend user document not found');
         }
@@ -53,9 +66,8 @@ export class FriendsService {
             throw new ConflictException('이미 친구 요청을 보냈습니다.');
         }
 
-        // 상대방이 요청
+        // 상대방이 요청한 경우 자동 수락
         if (friendUserIndex !== -1 && friendDocument.friends[friendUserIndex].status === 'pending' && friendDocument.friends[friendUserIndex].who === friendName) {
-
             if (userFriendIndex !== -1) {
                 user.friends[userFriendIndex].status = 'accepted';
                 user.friends[userFriendIndex].createdat = new Date();
@@ -71,23 +83,7 @@ export class FriendsService {
             friendDocument.friends[friendUserIndex].status = 'accepted';
             friendDocument.friends[friendUserIndex].createdat = new Date();
 
-            await user.save();
-            await friendDocument.save();
-
-            if (friendDocument.friends[friendUserIndex]?.status === 'accepted') {
-                const createRelationshipQuery = this.neo4j.query()
-                    .raw(`
-                    MATCH (p1:Person {userId: $userId})
-                    MATCH (p2:Person {userId: $friendId})
-                    MERGE (p1)-[:FRIEND]->(p2)
-                    MERGE (p2)-[:FRIEND]->(p1)
-                  `, {
-                        userId,
-                        friendId
-                    });
-
-                await createRelationshipQuery.run();
-            }
+            await Promise.all([user.save(), friendDocument.save()]);
 
             return { message: '친구 요청 수락' };
         }
@@ -125,67 +121,44 @@ export class FriendsService {
             };
         }
 
-        await user.save();
-        await friendDocument.save();
+        await Promise.all([user.save(), friendDocument.save()]);
 
         return { message: `${friendName}에게 성공적으로 친구 요청을 보냈어요.` };
     }
 
     // 요청 수락
     async acceptRequest(userid: string, friendName: string): Promise<{ message: string }> {
-        // friend
-        const friendUser = await this.userModel.findOne({ name: friendName }).exec();
+        const friendUser = await this.userModel.findOne({ name: friendName }).select('userId').lean().exec();
         if (!friendUser) {
             throw new ConflictException('Friend not found');
         }
 
         const friendId = friendUser.userId;
 
-        // user friends
-        const userDocument = await this.friendModel.findOne({ userid }).exec();
-        if (!userDocument) {
+        const [userDocument, friendDocument] = await Promise.all([
+            this.friendModel.findOne({ userid }).exec(),
+            this.friendModel.findOne({ userid: friendId }).exec()
+        ]);
+
+        if (!userDocument || !friendDocument) {
             throw new ConflictException('User document not found');
         }
 
-        // 사용자 friends pending
         const userFriendIndex = userDocument.friends.findIndex(f => f.friendid === friendId && f.status === 'pending');
-        if (userFriendIndex === -1) {
-            throw new ConflictException('해당 친구 요청을 찾을 수 없습니다.');
-        }
-
-        // friend pending
-        const friendDocument = await this.friendModel.findOne({ userid: friendId }).exec();
-        if (!friendDocument) {
-            throw new ConflictException('Friend document not found');
-        }
-
         const friendUserFriendIndex = friendDocument.friends.findIndex(f => f.friendid === userid && f.status === 'pending');
-        if (friendUserFriendIndex === -1) {
+        
+        if (userFriendIndex === -1 || friendUserFriendIndex === -1) {
             throw new ConflictException('해당 친구 요청을 찾을 수 없습니다.');
         }
 
-        // accepted
+        // 친구 상태를 accepted로 변경
         userDocument.friends[userFriendIndex].status = 'accepted';
         userDocument.friends[userFriendIndex].createdat = new Date();
 
         friendDocument.friends[friendUserFriendIndex].status = 'accepted';
         friendDocument.friends[friendUserFriendIndex].createdat = new Date();
 
-        await userDocument.save();
-        await friendDocument.save();
-
-        const createRelationshipQuery = this.neo4j.query()
-            .raw(`
-          MATCH (p1:Person {userId: $userId})
-          MATCH (p2:Person {userId: $friendId})
-          MERGE (p1)-[:FRIEND]->(p2)
-          MERGE (p2)-[:FRIEND]->(p1)
-        `, {
-                userId: userid,
-                friendId: friendId
-            });
-
-        await createRelationshipQuery.run();
+        await Promise.all([userDocument.save(), friendDocument.save()]);
 
         return { message: '수락 완료' };
     }
@@ -193,55 +166,40 @@ export class FriendsService {
     // 삭제
     async deleteFriend(userid: string, friendName: string): Promise<boolean> {
         try {
-            // 사용자 문서
-            const userDocument = await this.friendModel.findOne({ userid }).exec();
-            if (!userDocument) {
-                throw new ConflictException('User not found');
-            }
-
-            // 친구 userId
-            const friend = await this.userModel.findOne({ name: friendName }).exec();
+            const friend = await this.userModel.findOne({ name: friendName }).select('userId').lean().exec();
             if (!friend) {
                 throw new ConflictException('Friend not found');
             }
             const friendId = friend.userId;
 
-            // 사용자 friends 배열 삭제
+            const [userDocument, friendDocument] = await Promise.all([
+                this.friendModel.findOne({ userid }).exec(),
+                this.friendModel.findOne({ userid: friendId }).exec()
+            ]);
+
+            if (!userDocument || !friendDocument) {
+                throw new ConflictException('User document not found');
+            }
+
+            // 친구 관계 제거
             userDocument.friends = userDocument.friends.filter(friendArray =>
                 friendArray.friendid !== friendId
             );
 
-            // 친구 friends 배열 삭제
-            const friendDocument = await this.friendModel.findOne({ userid: friendId }).exec();
-            if (!friendDocument) {
-                throw new ConflictException('Friend user document not found');
-            }
             friendDocument.friends = friendDocument.friends.filter(friendArray =>
                 friendArray.friendid !== userid
             );
 
-            await userDocument.save();
-            await friendDocument.save();
-
-            const deleteRelationshipQuery = this.neo4j.query()
-                .raw(`
-              MATCH (p1:Person {userId: $userId})-[r:FRIEND]-(p2:Person {userId: $friendId})
-              DELETE r
-            `, {
-                    userId: userid,
-                    friendId: friendId
-                });
-
-            await deleteRelationshipQuery.run();
-
             // 채팅방 삭제
-            const chatRoom = await this.chatRoomModel.findOne({
-                participants: { $all: [userid, friendId] },
-            }).exec();
+            const operations = [
+                userDocument.save(),
+                friendDocument.save(),
+                this.chatRoomModel.deleteOne({
+                    participants: { $all: [userid, friendId] }
+                }).exec()
+            ];
 
-            if (chatRoom) {
-                await this.chatRoomModel.deleteOne({ _id: chatRoom._id }).exec();
-            }
+            await Promise.all(operations);
 
             return true;
 
@@ -253,20 +211,35 @@ export class FriendsService {
 
     async getFriends(userid: string): Promise<{ name: string, iconColor: string }[]> {
         try {
-            // 사용자 문서
-            const friendDocument = await this.friendModel.findOne({ userid }).exec();
+            const friendDocument = await this.friendModel
+                .findOne({ userid })
+                .select('friends')
+                .lean()
+                .exec();
+                
             if (!friendDocument) {
-                throw new ConflictException('User not found');
+                // Friend 문서가 없는 경우 새로 생성
+                console.log(`Friend document not found for user ${userid}, creating new one`);
+                await this.createFriendDocument(userid, 'Unknown');
+                return [];
             }
 
-            // 상태 accepted 인것만
-            const acceptedFriends = friendDocument.friends.filter(friend => friend.status === 'accepted');
+            if (!friendDocument.friends || friendDocument.friends.length === 0) {
+                return [];
+            }
 
-            // userid
+            const acceptedFriends = friendDocument.friends.filter(friend => friend.status === 'accepted');
             const friendIds = acceptedFriends.map(friend => friend.friendid);
 
-            // name, iconColor
-            const friends = await this.userModel.find({ userId: { $in: friendIds } }).exec();
+            if (friendIds.length === 0) {
+                return [];
+            }
+
+            const friends = await this.userModel
+                .find({ userId: { $in: friendIds } })
+                .select('name iconColor')
+                .lean()
+                .exec();
 
             return friends.map(friend => ({
                 name: friend.name,
@@ -274,27 +247,43 @@ export class FriendsService {
             }));
 
         } catch (err) {
-            console.error(err);
-            throw new ConflictException('get_friends Error');
+            console.error('Error in getFriends:', err);
+            // 빈 배열 반환으로 더 안전하게 처리
+            return [];
         }
     }
 
     async getPendingFriends(userid: string): Promise<{ name: string, iconColor: string, who: string }[]> {
         try {
-            // 사용자 문서
-            const friendDocument = await this.friendModel.findOne({ userid }).exec();
+            const friendDocument = await this.friendModel
+                .findOne({ userid })
+                .select('friends')
+                .lean()
+                .exec();
+                
             if (!friendDocument) {
-                throw new ConflictException('User not found');
+                // Friend 문서가 없는 경우 새로 생성
+                console.log(`Friend document not found for user ${userid}, creating new one`);
+                await this.createFriendDocument(userid, 'Unknown');
+                return [];
             }
 
-            // 상태 pending 인것만
-            const pendingFriends = friendDocument.friends.filter(friend => friend.status === 'pending');
+            if (!friendDocument.friends || friendDocument.friends.length === 0) {
+                return [];
+            }
 
-            // userid
+            const pendingFriends = friendDocument.friends.filter(friend => friend.status === 'pending');
             const friendIds = pendingFriends.map(friend => friend.friendid);
 
-            // name, iconColor
-            const friends = await this.userModel.find({ userId: { $in: friendIds } }).exec();
+            if (friendIds.length === 0) {
+                return [];
+            }
+
+            const friends = await this.userModel
+                .find({ userId: { $in: friendIds } })
+                .select('name iconColor userId')
+                .lean()
+                .exec();
 
             return friends.map(friend => {
                 const pendingFriend = pendingFriends.find(pf => pf.friendid === friend.userId);
@@ -306,20 +295,35 @@ export class FriendsService {
             });
 
         } catch (err) {
-            console.error(err);
-            throw new ConflictException('get_friends Error');
+            console.error('Error in getPendingFriends:', err);
+            // 빈 배열 반환으로 더 안전하게 처리
+            return [];
         }
     }
 
-
-    // 새로운 사용자 추가
+    // 새로운 사용자 추가 (개선된 버전)
     async createFriendDocument(userId: string, name: string): Promise<void> {
-        // 기본 문서 생성
-        const newFriendDocument = new this.friendModel({
-            userid: userId,
-            name: name,
-            friends: []
-        });
-        await newFriendDocument.save();
+        try {
+            // 이미 존재하는지 확인
+            const existing = await this.friendModel.findOne({ userid: userId }).lean().exec();
+            if (existing) {
+                console.log(`Friend document already exists for user ${userId}`);
+                return;
+            }
+
+            const newFriendDocument = new this.friendModel({
+                userid: userId,
+                name: name,
+                friends: []
+            });
+            await newFriendDocument.save();
+            console.log(`Created friend document for user ${userId}`);
+        } catch (error) {
+            console.error(`Error creating friend document for user ${userId}:`, error);
+            // 중복 키 오류는 무시 (이미 존재하는 경우)
+            if (error.code !== 11000) {
+                throw error;
+            }
+        }
     }
 }
